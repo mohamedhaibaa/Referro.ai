@@ -47,6 +47,15 @@
     --progress-lavender: 270 60% 65%;
     --progress-pink: 350 60% 75%;
 
+    /* Calendar event colors */
+    --calendar-job: 220 80% 55%;
+    --calendar-outreach: 160 60% 45%;
+    --calendar-interview: 270 70% 60%;
+    --calendar-coffee: 35 90% 55%;
+    --calendar-followup: 45 100% 55%;
+    --calendar-relationship: 320 70% 60%;
+    --calendar-personal: 200 60% 55%;
+
     /* Sidebar */
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 220 10% 50%;

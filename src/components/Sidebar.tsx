@@ -1,12 +1,16 @@
-import { LayoutGrid, FileText, CheckSquare, Grid2X2, Bell, Headphones, Settings, LogOut } from "lucide-react";
+import { LayoutGrid, FileText, CheckSquare, Grid2X2, Bell, Headphones, Settings, LogOut, Calendar } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
 const Sidebar = () => {
+  const location = useLocation();
+  
   const topIcons = [
-    { icon: LayoutGrid, active: false },
-    { icon: FileText, active: true },
-    { icon: CheckSquare, active: false },
-    { icon: Grid2X2, active: false },
-    { icon: Bell, active: false },
+    { icon: LayoutGrid, active: false, to: "/" },
+    { icon: FileText, active: location.pathname === "/", to: "/" },
+    { icon: Calendar, active: location.pathname === "/calendar", to: "/calendar" },
+    { icon: CheckSquare, active: false, to: "/" },
+    { icon: Grid2X2, active: false, to: "/" },
+    { icon: Bell, active: false, to: "/" },
   ];
 
   const bottomIcons = [
@@ -18,8 +22,9 @@ const Sidebar = () => {
     <aside className="fixed left-0 top-0 h-screen w-20 bg-card border-r border-border flex flex-col items-center py-6 z-50">
       <div className="flex flex-col items-center gap-2 flex-1">
         {topIcons.map((item, index) => (
-          <button
+          <Link
             key={index}
+            to={item.to}
             className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
               item.active
                 ? "bg-sidebar-primary text-sidebar-primary-foreground"
@@ -27,7 +32,7 @@ const Sidebar = () => {
             }`}
           >
             <item.icon size={22} strokeWidth={item.active ? 2 : 1.5} />
-          </button>
+          </Link>
         ))}
       </div>
 
