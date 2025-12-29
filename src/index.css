@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 40 20% 96%;
+    --foreground: 220 20% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 15%;
+
+    --primary: 24 100% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 30% 94%;
+    --secondary-foreground: 220 20% 15%;
+
+    --muted: 40 20% 92%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 40 30% 94%;
+    --accent-foreground: 220 20% 15%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 40 20% 88%;
+    --input: 40 20% 88%;
+    --ring: 24 100% 62%;
+
+    --radius: 1rem;
+
+    /* Custom colors for course cards */
+    --card-yellow: 45 100% 85%;
+    --card-lavender: 270 60% 92%;
+    --card-pink: 350 80% 92%;
+    --card-dark: 220 20% 15%;
+
+    /* Progress bar colors */
+    --progress-yellow: 45 100% 55%;
+    --progress-lavender: 270 60% 65%;
+    --progress-pink: 350 60% 75%;
+
+    /* Sidebar */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 10% 50%;
+    --sidebar-primary: 45 100% 55%;
+    --sidebar-primary-foreground: 220 20% 15%;
+    --sidebar-accent: 45 100% 92%;
+    --sidebar-accent-foreground: 220 20% 15%;
+    --sidebar-border: 40 20% 90%;
+    --sidebar-ring: 24 100% 62%;
+  }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 40 20% 96%;
+
+    --card: 220 20% 15%;
+    --card-foreground: 40 20% 96%;
+
+    --popover: 220 20% 15%;
+    --popover-foreground: 40 20% 96%;
+
+    --primary: 24 100% 62%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 20%;
+    --secondary-foreground: 40 20% 96%;
+
+    --muted: 220 20% 20%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 220 20% 20%;
+    --accent-foreground: 40 20% 96%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 40 20% 96%;
+
+    --border: 220 20% 25%;
+    --input: 220 20% 25%;
+    --ring: 24 100% 62%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  .card-yellow {
+    background: hsl(var(--card-yellow));
+  }
+  
+  .card-lavender {
+    background: hsl(var(--card-lavender));
+  }
+  
+  .card-pink {
+    background: hsl(var(--card-pink));
+  }
+
+  .card-dark {
+    background: hsl(var(--card-dark));
+  }
+
+  .progress-yellow {
+    background: hsl(var(--progress-yellow));
+  }
+
+  .progress-lavender {
+    background: hsl(var(--progress-lavender));
+  }
+
+  .progress-pink {
+    background: hsl(var(--progress-pink));
+  }
+}
