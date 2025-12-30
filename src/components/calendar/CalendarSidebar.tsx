@@ -49,31 +49,32 @@ const CalendarSidebar = ({
       </Button>
 
       {/* Mini Calendar */}
-      <div className="bg-muted/50 rounded-xl p-2 overflow-hidden">
+      <div className="bg-muted/50 rounded-xl p-3">
         <Calendar
           mode="single"
           selected={currentDate}
           onSelect={(date) => date && onDateSelect(date)}
-          className="pointer-events-auto w-full"
+          className="pointer-events-auto !w-full"
           classNames={{
-            months: "flex flex-col",
-            month: "space-y-2",
-            caption: "flex justify-center pt-1 relative items-center",
+            months: "flex flex-col w-full",
+            month: "space-y-3 w-full",
+            caption: "flex justify-center pt-1 relative items-center w-full",
             caption_label: "text-sm font-medium",
             nav: "space-x-1 flex items-center",
-            nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100",
-            nav_button_previous: "absolute left-1",
-            nav_button_next: "absolute right-1",
+            nav_button: "h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100 inline-flex items-center justify-center",
+            nav_button_previous: "absolute left-0",
+            nav_button_next: "absolute right-0",
             table: "w-full border-collapse",
-            head_row: "flex justify-between",
-            head_cell: "text-muted-foreground rounded-md w-8 font-normal text-[0.7rem]",
-            row: "flex w-full justify-between mt-1",
-            cell: "h-8 w-8 text-center text-xs p-0 relative",
-            day: "h-8 w-8 p-0 font-normal text-xs hover:bg-accent rounded-md",
+            head_row: "grid grid-cols-7 w-full",
+            head_cell: "text-muted-foreground font-normal text-[0.7rem] text-center",
+            row: "grid grid-cols-7 w-full mt-1",
+            cell: "text-center text-xs p-0 relative aspect-square flex items-center justify-center",
+            day: "h-7 w-7 p-0 font-normal text-xs hover:bg-accent rounded-md inline-flex items-center justify-center",
             day_selected: "bg-primary text-primary-foreground hover:bg-primary",
             day_today: "bg-accent text-accent-foreground",
             day_outside: "text-muted-foreground opacity-50",
             day_disabled: "text-muted-foreground opacity-50",
+            day_hidden: "invisible",
           }}
         />
       </div>
