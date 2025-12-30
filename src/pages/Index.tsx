@@ -5,6 +5,7 @@ import DailyGoalCard from "@/components/DailyGoalCard";
 import MetricsCard from "@/components/MetricsCard";
 import TasksCard from "@/components/TasksCard";
 import InboxPreview from "@/components/inbox/InboxPreview";
+import JobsPreview from "@/components/jobs/JobsPreview";
 import { sampleJobs } from "@/data/jobs";
 import { Job } from "@/types/job";
 
@@ -28,7 +29,10 @@ const Index = () => {
           <TasksCard totalTasks={12} completedTasks={7} />
         </div>
 
-        <InboxPreview jobs={jobs} />
+        <div className="grid grid-cols-2 gap-5">
+          <InboxPreview jobs={jobs} />
+          <JobsPreview jobs={jobs} />
+        </div>
       </main>
     </div>
   );
