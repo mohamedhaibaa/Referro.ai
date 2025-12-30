@@ -8,15 +8,26 @@ export type JobStatus =
   | "Offer"
   | "Closed";
 
+export type FitScore = "High" | "Medium" | "Low" | null;
+export type WorkMode = "Remote" | "Hybrid" | "On-site";
+export type RoleFamily = "PM" | "SWE" | "DS" | "Design" | "Other";
+
 export interface Job {
   id: string;
   title: string;
   company: string;
+  companyLogoUrl?: string;
   dueDate: string;
   status: JobStatus;
   url: string;
   description?: string;
   progress: number;
+  fitScore?: FitScore;
+  workMode?: WorkMode;
+  roleFamily?: RoleFamily;
+  hasSelectedContact: boolean;
+  hasOutreachDraft: boolean;
+  outreachMarkedSent: boolean;
   milestones: {
     resumeTailored: boolean;
     contactSelected: boolean;
@@ -68,3 +79,27 @@ export interface ActivityItem {
   action: string;
   timestamp: string;
 }
+
+export const PIPELINE_STAGES: JobStatus[] = [
+  "Interested",
+  "Outreach Ready",
+  "Outreach Sent",
+  "Replied",
+  "Meeting Booked",
+  "Interviewing",
+  "Offer",
+  "Closed",
+];
+
+export const getNextStepLabel = (job: Job): string => {
+  if (!job.hasSelectedContact) return "Find Contacts";
+  if (!job.hasOutreachDraft) return "Generate Outreach";
+  if (!job.outreachMarkedSent) return "Mark Outreach Sent";
+  if (job.status === "Outreach Sent") return "Follow-up Prep";
+  if (job.status === "Replied") return "Log Reply";
+  if (job.status === "Meeting Booked") return "Prep Coffee Chat";
+  if (job.status === "Interviewing") return "Start Interview Prep";
+  if (job.status === "Offer") return "Review Offer";
+  if (job.status === "Closed") return "View Summary";
+  return "Next Step";
+};
