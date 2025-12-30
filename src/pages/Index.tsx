@@ -4,12 +4,12 @@ import Header from "@/components/Header";
 import DailyGoalCard from "@/components/DailyGoalCard";
 import MetricsCard from "@/components/MetricsCard";
 import TasksCard from "@/components/TasksCard";
-import KanbanBoard from "@/components/kanban/KanbanBoard";
+import InboxPreview from "@/components/inbox/InboxPreview";
 import { sampleJobs } from "@/data/jobs";
 import { Job } from "@/types/job";
 
 const Index = () => {
-  const [jobs, setJobs] = useState<Job[]>(sampleJobs);
+  const [jobs] = useState<Job[]>(sampleJobs);
 
   return (
     <div className="min-h-screen bg-background">
@@ -28,7 +28,7 @@ const Index = () => {
           <TasksCard totalTasks={12} completedTasks={7} />
         </div>
 
-        <KanbanBoard jobs={jobs} onJobsChange={setJobs} />
+        <InboxPreview jobs={jobs} />
       </main>
     </div>
   );
