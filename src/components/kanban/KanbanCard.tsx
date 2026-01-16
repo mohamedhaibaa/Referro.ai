@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MoreHorizontal, ExternalLink, Zap, Building2 } from "lucide-react";
-import { Job, getNextStepLabel, FitScore } from "@/types/job";
+import { Job, getNextStepLabel } from "@/types/job";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -20,17 +20,6 @@ interface KanbanCardProps {
   onDragStart?: (e: React.DragEvent, jobId: string) => void;
 }
 
-const fitScoreColors: Record<NonNullable<FitScore>, string> = {
-  High: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
-  Medium: "bg-amber-500/10 text-amber-600 border-amber-200",
-  Low: "bg-red-500/10 text-red-600 border-red-200",
-};
-
-const workModeColors: Record<string, string> = {
-  Remote: "bg-blue-500/10 text-blue-600",
-  Hybrid: "bg-purple-500/10 text-purple-600",
-  "On-site": "bg-orange-500/10 text-orange-600",
-};
 
 const KanbanCard = ({ job, onMoveToColumn, onDragStart }: KanbanCardProps) => {
   const navigate = useNavigate();
@@ -149,37 +138,6 @@ const KanbanCard = ({ job, onMoveToColumn, onDragStart }: KanbanCardProps) => {
         <span className="text-xs text-muted-foreground truncate">
           {job.company}
         </span>
-      </div>
-
-      {/* Tags Row */}
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {/* Fit Score */}
-        <Badge
-          variant="outline"
-          className={cn(
-            "text-[10px] px-1.5 py-0 h-5",
-            job.fitScore ? fitScoreColors[job.fitScore] : "text-muted-foreground"
-          )}
-        >
-          Fit: {job.fitScore || "—"}
-        </Badge>
-
-        {/* Work Mode */}
-        {job.workMode && (
-          <Badge
-            variant="secondary"
-            className={cn("text-[10px] px-1.5 py-0 h-5", workModeColors[job.workMode])}
-          >
-            {job.workMode}
-          </Badge>
-        )}
-
-        {/* Role Family */}
-        {job.roleFamily && (
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
-            {job.roleFamily}
-          </Badge>
-        )}
       </div>
 
       {/* Custom Tags */}

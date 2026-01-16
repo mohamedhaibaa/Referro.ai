@@ -37,9 +37,6 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
   );
 
   const [filters, setFilters] = useState<FilterState>({
-    roleFamily: [],
-    workMode: [],
-    fitScore: [],
     company: "",
     tags: [],
     status: [],
@@ -65,30 +62,6 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
           job.company.toLowerCase().includes(query) ||
           job.tags?.some((tag) => tag.toLowerCase().includes(query));
         if (!matchesSearch) return false;
-      }
-
-      // Role Family
-      if (
-        filters.roleFamily.length > 0 &&
-        (!job.roleFamily || !filters.roleFamily.includes(job.roleFamily))
-      ) {
-        return false;
-      }
-
-      // Work Mode
-      if (
-        filters.workMode.length > 0 &&
-        (!job.workMode || !filters.workMode.includes(job.workMode))
-      ) {
-        return false;
-      }
-
-      // Fit Score
-      if (
-        filters.fitScore.length > 0 &&
-        (!job.fitScore || !filters.fitScore.includes(job.fitScore))
-      ) {
-        return false;
       }
 
       // Company
@@ -179,9 +152,6 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
   };
 
   const hasActiveFilters =
-    filters.roleFamily.length > 0 ||
-    filters.workMode.length > 0 ||
-    filters.fitScore.length > 0 ||
     filters.company.length > 0 ||
     filters.tags.length > 0 ||
     filters.status.length > 0;
@@ -259,10 +229,7 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
           Filters
           {hasActiveFilters && (
             <span className="ml-1 bg-primary-foreground/20 text-xs px-1.5 rounded-full">
-              {filters.roleFamily.length +
-                filters.workMode.length +
-                filters.fitScore.length +
-                filters.status.length +
+              {filters.status.length +
                 filters.tags.length +
                 (filters.company ? 1 : 0)}
             </span>
@@ -344,16 +311,15 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
         <div className="flex-1 overflow-auto">
           {/* List View - Simple table */}
           <div className="border border-border rounded-xl overflow-hidden">
-            <div className="grid grid-cols-[1fr_150px_120px_120px] gap-4 px-4 py-3 bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground font-medium">
+            <div className="grid grid-cols-[1fr_150px_150px] gap-4 px-4 py-3 bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground font-medium">
               <div>Job Title</div>
               <div>Company</div>
               <div>Status</div>
-              <div>Fit</div>
             </div>
             {filteredJobs.map((job) => (
               <div
                 key={job.id}
-                className="grid grid-cols-[1fr_150px_120px_120px] gap-4 px-4 py-3 border-t border-border hover:bg-muted/30 cursor-pointer transition-colors"
+                className="grid grid-cols-[1fr_150px_150px] gap-4 px-4 py-3 border-t border-border hover:bg-muted/30 cursor-pointer transition-colors"
               >
                 <div className="font-medium text-foreground truncate">
                   {job.title}
@@ -363,9 +329,6 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
                   <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
                     {job.status}
                   </span>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {job.fitScore || "—"}
                 </div>
               </div>
             ))}
