@@ -12,12 +12,9 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { JobStatus, FitScore, WorkMode, RoleFamily, PIPELINE_STAGES } from "@/types/job";
+import { JobStatus, PIPELINE_STAGES } from "@/types/job";
 
 export interface FilterState {
-  roleFamily: RoleFamily[];
-  workMode: WorkMode[];
-  fitScore: FitScore[];
   company: string;
   tags: string[];
   status: JobStatus[];
@@ -31,9 +28,6 @@ interface KanbanFiltersProps {
   availableTags: string[];
 }
 
-const roleFamilies: RoleFamily[] = ["PM", "SWE", "DS", "Design", "Other"];
-const workModes: WorkMode[] = ["Remote", "Hybrid", "On-site"];
-const fitScores: NonNullable<FitScore>[] = ["High", "Medium", "Low"];
 
 const KanbanFilters = ({
   open,
@@ -50,9 +44,6 @@ const KanbanFilters = ({
 
   const handleClearAll = () => {
     onFiltersChange({
-      roleFamily: [],
-      workMode: [],
-      fitScore: [],
       company: "",
       tags: [],
       status: [],
@@ -60,9 +51,6 @@ const KanbanFilters = ({
   };
 
   const hasActiveFilters =
-    filters.roleFamily.length > 0 ||
-    filters.workMode.length > 0 ||
-    filters.fitScore.length > 0 ||
     filters.company.length > 0 ||
     filters.tags.length > 0 ||
     filters.status.length > 0;
@@ -76,81 +64,6 @@ const KanbanFilters = ({
 
         <ScrollArea className="h-[calc(100vh-180px)] pr-4 mt-6">
           <div className="space-y-6">
-            {/* Role Family */}
-            <div>
-              <Label className="text-sm font-medium mb-3 block">Role Family</Label>
-              <div className="flex flex-wrap gap-2">
-                {roleFamilies.map((role) => (
-                  <Button
-                    key={role}
-                    variant={filters.roleFamily.includes(role) ? "default" : "outline"}
-                    size="sm"
-                    className="h-8"
-                    onClick={() =>
-                      onFiltersChange({
-                        ...filters,
-                        roleFamily: toggleArrayItem(filters.roleFamily, role),
-                      })
-                    }
-                  >
-                    {role}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Work Mode */}
-            <div>
-              <Label className="text-sm font-medium mb-3 block">Work Mode</Label>
-              <div className="flex flex-wrap gap-2">
-                {workModes.map((mode) => (
-                  <Button
-                    key={mode}
-                    variant={filters.workMode.includes(mode) ? "default" : "outline"}
-                    size="sm"
-                    className="h-8"
-                    onClick={() =>
-                      onFiltersChange({
-                        ...filters,
-                        workMode: toggleArrayItem(filters.workMode, mode),
-                      })
-                    }
-                  >
-                    {mode}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Fit Score */}
-            <div>
-              <Label className="text-sm font-medium mb-3 block">Fit Score</Label>
-              <div className="flex flex-wrap gap-2">
-                {fitScores.map((score) => (
-                  <Button
-                    key={score}
-                    variant={filters.fitScore.includes(score) ? "default" : "outline"}
-                    size="sm"
-                    className="h-8"
-                    onClick={() =>
-                      onFiltersChange({
-                        ...filters,
-                        fitScore: toggleArrayItem(filters.fitScore, score),
-                      })
-                    }
-                  >
-                    {score}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
             {/* Company */}
             <div>
               <Label className="text-sm font-medium mb-3 block">Company</Label>
