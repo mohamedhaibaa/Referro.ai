@@ -1,8 +1,8 @@
 # Backend Handover / Functional Blueprint
 
-## Jobless - Job Search Management Dashboard
+## Jobless - Professional Outreach & Networking Tool
 
-**Document Version:** 1.0  
+**Document Version:** 1.1  
 **Last Updated:** January 2025  
 **Status:** Frontend-Only (Backend Implementation Required)
 
@@ -15,12 +15,13 @@
 3. [Page-by-Page Breakdown](#3-page-by-page-breakdown)
 4. [Component & Feature Breakdown](#4-component--feature-breakdown)
 5. [Data & Backend Requirements](#5-data--backend-requirements)
-6. [API Contract Draft](#6-api-contract-draft)
-7. [State & Hardcoded Data Replacement](#7-state--hardcoded-data-replacement)
-8. [Authentication & Authorization](#8-authentication--authorization)
-9. [Admin / CMS Needs](#9-admin--cms-needs)
-10. [Non-Functional Requirements](#10-non-functional-requirements)
-11. [Open Questions & Assumptions](#11-open-questions--assumptions)
+6. [Recommended Database Structure](#6-recommended-database-structure)
+7. [API Contract Draft](#7-api-contract-draft)
+8. [State & Hardcoded Data Replacement](#8-state--hardcoded-data-replacement)
+9. [Authentication & Authorization](#9-authentication--authorization)
+10. [Admin / CMS Needs](#10-admin--cms-needs)
+11. [Non-Functional Requirements](#11-non-functional-requirements)
+12. [Open Questions & Assumptions](#12-open-questions--assumptions)
 
 ---
 
@@ -28,49 +29,54 @@
 
 ### 1.1 Purpose
 
-**Jobless** is a job search management dashboard designed to help job seekers:
-- Track job applications through a visual pipeline (Kanban board)
-- Manage networking outreach and follow-ups
-- Prepare for interviews with structured prep workflows
-- Schedule and track meetings, coffee chats, and deadlines
-- Gamify the job search with daily goals and progress metrics
+**Jobless** is a **professional outreach and networking tool** designed to help job seekers:
+
+- **Find the right people** to reach out to at target companies
+- **Prepare compelling outreach messages** (LinkedIn messages, emails, etc.)
+- **Track outreach status** and follow-ups
+- **Prepare for coffee chats** once a conversation is started
+- Visualize their networking pipeline (Kanban board view)
+
+> ⚠️ **IMPORTANT CLARIFICATION**: This is NOT a job search/organizing tool. The core value is in the **outreach workflow** — helping users identify contacts, craft messages, and manage networking conversations. The pipeline visualization is a secondary feature for better organization.
 
 ### 1.2 Problem Solved
 
-Job searching is chaotic and overwhelming. This application transforms the unstructured process into a gamified, organized workflow with clear next steps, automated reminders, and progress tracking.
+Networking for job opportunities is intimidating and unstructured. Users struggle to:
+- Find the right person to contact at a company
+- Know what to say in their outreach
+- Track who they've contacted and what stage each conversation is in
+- Prepare for coffee chats when someone responds
 
-### 1.3 Primary User Types/Roles
+This application transforms cold outreach into a structured, guided workflow with clear next steps.
+
+### 1.3 Core User Flow
+
+```
+1. User pastes a LinkedIn job URL
+2. System scrapes/extracts job details (title, company, description)
+3. User clicks "Find Contacts" → System suggests people to reach out to
+4. User selects a contact
+5. System generates personalized outreach message
+6. User sends outreach (marks as sent in app)
+7. System schedules follow-up reminder
+8. If contact replies → User logs it, prepares for coffee chat
+9. User has coffee chat → Logs outcome
+```
+
+### 1.4 Primary User Types/Roles
 
 | Role | Description | Current Status |
 |------|-------------|----------------|
-| **Job Seeker (Primary)** | Active job searcher managing applications | Implemented (UI only) |
-| **Admin** | System administrator managing templates, settings | NOT implemented |
+| **Job Seeker (Primary)** | Professional managing networking outreach | Implemented (UI only) |
+| **Admin** | System administrator | NOT implemented |
 | **Guest/Unauthenticated** | Landing page visitor | NOT implemented |
 
-### 1.4 High-Level User Journeys
+### 1.5 What This Tool is NOT
 
-#### Happy Path: New Job Application
-
-```
-1. User adds new job (via URL or manual entry)
-2. System extracts job details (title, company, description)
-3. User rates job fit
-4. User finds/selects contact for outreach
-5. System generates outreach message
-6. User sends outreach (marks as sent)
-7. System schedules follow-up reminder
-8. User receives reply → logs it
-9. User books meeting/interview
-10. User completes 3-day interview prep
-11. User records outcome (offer/rejected/withdrew)
-```
-
-#### Alternative Paths
-
-- **No contact found:** User proceeds without contact → generic application
-- **No reply received:** Follow-up nudge appears in inbox
-- **Interview scheduled:** Interview Mode activates with 3-day prep plan
-- **Job closed without interview:** User records outcome and reflects
+- ❌ NOT a job board or job search engine
+- ❌ NOT a calendar/scheduling tool (removed from scope)
+- ❌ NOT an interview preparation tool (postponed to future version)
+- ❌ NOT a resume builder
 
 ---
 
@@ -80,15 +86,16 @@ Job searching is chaotic and overwhelming. This application transforms the unstr
 
 | Route | Page Component | Description |
 |-------|---------------|-------------|
-| `/` | `Index.tsx` | Dashboard/Home with overview cards |
+| `/` | `Index.tsx` | Dashboard with overview cards |
 | `/inbox` | `Inbox.tsx` | Action items and to-do list |
-| `/jobs` | `Jobs.tsx` | Kanban board with all jobs |
-| `/job/:id` | `JobDetail.tsx` | Single job detail page |
-| `/calendar` | `Calendar.tsx` | Calendar with events |
+| `/jobs` | `Jobs.tsx` | Kanban board with all job opportunities |
+| `/job/:id` | `JobDetail.tsx` | Single job detail with outreach tools |
 | `/resume` | NOT IMPLEMENTED | Resume management (placeholder) |
 | `/settings` | NOT IMPLEMENTED | User settings (placeholder) |
 | `/support` | NOT IMPLEMENTED | Support page (placeholder) |
 | `*` | `NotFound.tsx` | 404 fallback |
+
+> 📌 **Note:** The `/calendar` route has been removed from scope.
 
 ### 2.2 Navigation Map
 
@@ -120,12 +127,6 @@ Job searching is chaotic and overwhelming. This application transforms the unstr
      └──────────▶│  Inbox   │─────────────┘
                  │  /inbox  │  (Start action → Job Detail)
                  └──────────┘
-                      │
-                      ▼
-                 ┌──────────┐
-                 │ Calendar │
-                 │/calendar │
-                 └──────────┘
 ```
 
 **Key Navigation Triggers:**
@@ -145,7 +146,7 @@ Job searching is chaotic and overwhelming. This application transforms the unstr
 **File:** `src/pages/Index.tsx`
 
 #### Purpose
-Central hub showing at-a-glance metrics, pending actions, and quick access to active jobs.
+Central hub showing at-a-glance metrics, pending outreach actions, and active job opportunities.
 
 #### UI Sections/Components
 
@@ -169,23 +170,9 @@ Central hub showing at-a-glance metrics, pending actions, and quick access to ac
 | Search (header) | **NOT FUNCTIONAL** | Search API |
 | Bell notification (header) | **NOT FUNCTIONAL** | Notifications API |
 
-#### Inputs & Expected Behavior
-
-| Input | Type | Behavior |
-|-------|------|----------|
-| Search box | Text input | Currently non-functional. Should search jobs by title/company. |
-
-#### Validation Rules
-- None currently implemented
-- **Needed:** Search input validation (min 2 chars, max 100 chars)
-
 #### Loading/Empty States
 - **Current:** No loading states (data is hardcoded)
 - **Needed:** Skeleton loaders for each card while fetching
-
-#### Empty States Needed
-- "No jobs yet" → Show on Jobs Preview if no jobs
-- "You're all caught up!" → Show on Inbox Preview if no actions
 
 ---
 
@@ -194,7 +181,7 @@ Central hub showing at-a-glance metrics, pending actions, and quick access to ac
 **File:** `src/pages/Inbox.tsx`
 
 #### Purpose
-Prioritized action list showing what the user should work on next, derived from job states.
+Prioritized action list showing what the user should work on next, derived from job states. This is the **command center** for outreach activities.
 
 #### UI Sections/Components
 
@@ -208,6 +195,19 @@ Prioritized action list showing what the user should work on next, derived from 
 | Snoozed Section | `InboxRow.tsx` | Actions where `isSnoozed = true` |
 | Completed Section | `InboxRow.tsx` | Actions where `isCompleted = true` |
 
+#### Inbox Action Types (Outreach-Focused)
+
+| Type | Tag | When Generated |
+|------|-----|----------------|
+| `FIND_CONTACTS` | Setup | Job has `!hasSelectedContact` and not Closed |
+| `GENERATE_OUTREACH` | Outreach | Has contact, no draft, not Closed |
+| `SEND_OUTREACH` | Outreach | Has draft, not marked sent |
+| `LOG_REPLY` | Engagement | Status = "Replied" |
+| `PREP_MEETING` | Meeting | Status = "Meeting Booked" |
+| `WAITING_NUDGE` | Follow-up | Status = "Outreach Sent" (nudge to follow up) |
+
+> 📌 **Note:** `RATE_FIT` and `INTERVIEW_PREP` actions have been removed from scope.
+
 #### User Actions
 
 | Action | Behavior | Backend Need |
@@ -217,28 +217,6 @@ Prioritized action list showing what the user should work on next, derived from 
 | Click "Mark Done" | Move to completed list | Persist completion state |
 | Search | Filter actions by title | Local filter (OK) or API |
 | Toggle view mode | Switch grouped/flat display | None (local state) |
-| Collapse/expand sections | Toggle visibility | None (local state) |
-
-#### Inbox Action Types
-
-| Type | Tag | When Generated |
-|------|-----|----------------|
-| `RATE_FIT` | Setup | Job has no `fitScore` |
-| `FIND_CONTACTS` | Setup | Job has `!hasSelectedContact` and not Closed |
-| `GENERATE_OUTREACH` | Outreach | Has contact, no draft, not Closed |
-| `SEND_OUTREACH` | Outreach | Has draft, not marked sent |
-| `LOG_REPLY` | Engagement | Status = "Replied" |
-| `PREP_MEETING` | Meeting | Status = "Meeting Booked" |
-| `INTERVIEW_PREP` | Interview Prep | Status = "Interviewing" |
-| `WAITING_NUDGE` | Follow-up | Status = "Outreach Sent" |
-
-#### Validation Rules
-- Search: trim whitespace, case-insensitive match
-- **Needed:** Search length limit (min 1, max 100)
-
-#### Loading/Empty States
-- **Current:** "You're all caught up!" message when no pending actions
-- **Needed:** Loading skeleton while fetching jobs
 
 ---
 
@@ -247,18 +225,17 @@ Prioritized action list showing what the user should work on next, derived from 
 **File:** `src/pages/Jobs.tsx`
 
 #### Purpose
-Visual Kanban board showing all jobs organized by pipeline stage.
+Visual Kanban board showing all job opportunities organized by outreach stage.
 
-#### UI Sections/Components
+#### How Jobs Are Added
 
-| Section | Component | Data Required |
-|---------|-----------|---------------|
-| Header | `Header.tsx` | User profile |
-| Page Title | Inline | None |
-| Kanban Board | `KanbanBoard.tsx` | `jobs: Job[]` |
-| Kanban Filters | `KanbanFilters.tsx` | Filter state |
-| Kanban Columns | `KanbanColumn.tsx` | Jobs grouped by status |
-| Kanban Cards | `KanbanCard.tsx` | Individual job data |
+> ⚠️ **CRITICAL**: Users do NOT manually create jobs. The flow is:
+> 1. User pastes a **LinkedIn job posting URL**
+> 2. Backend scrapes the job page (using Firecrawl or similar)
+> 3. Job details are auto-extracted (title, company, description)
+> 4. Job is created with status "Interested"
+
+**This "Add Job" functionality is NOT yet visible in the UI** — it needs to be implemented.
 
 #### Pipeline Stages (Columns)
 
@@ -267,27 +244,31 @@ Interested → Outreach Ready → Outreach Sent → Replied →
 Meeting Booked → Interviewing → Offer → Closed
 ```
 
+> 📌 **Note:** "Interviewing" stage exists but Interview Prep functionality is postponed.
+
 #### User Actions
 
 | Action | Behavior | Backend Need |
 |--------|----------|--------------|
+| Paste job URL | Create new job (scrape & extract) | `POST /jobs` with URL scraping |
 | Click card | Navigate to `/job/:id` | None |
 | Drag card to column | Change job status | `PATCH /jobs/:id` |
 | Click "Move to X" in menu | Change job status | `PATCH /jobs/:id` |
 | Click "Next Step" button | Navigate to job detail | None |
 | Search jobs | Filter by title/company | Local or API |
 | Filter by status | Show only matching status | Local filter |
-| Toggle view (board/list) | Switch display mode | None (local) |
 
-#### Validation Rules
-- **Needed:** Prevent invalid status transitions (business logic TBD)
+#### Current Filter State (Simplified)
 
-#### Loading/Empty States
-- **Current:** None (hardcoded data)
-- **Needed:** 
-  - Loading skeleton for board
-  - "No jobs found" in column when empty
-  - "No jobs match filters" when filtered to zero
+The following filters have been **REMOVED** from the UI:
+- ~~Fit Score (High/Medium/Low)~~
+- ~~Work Mode (Remote/Hybrid/On-site)~~
+- ~~Role Family (PM/SWE/DS/Design)~~
+
+Current filters:
+- **Company** — text search
+- **Tags** — multi-select
+- **Status** — multi-select pipeline stages
 
 ---
 
@@ -296,45 +277,41 @@ Meeting Booked → Interviewing → Offer → Closed
 **File:** `src/pages/JobDetail.tsx`
 
 #### Purpose
-Comprehensive detail page for a single job with all management tools.
+Comprehensive detail page for a single job with all outreach and networking tools.
 
 #### UI Sections/Components
 
-| Section | Component | Data Required |
-|---------|-----------|---------------|
-| Back Button | Inline | None |
-| Job Header | Inline | Job title, company, deadline, URL, status |
-| Description | Inline | Job description (collapsible) |
-| Progress Tracker | `ProgressTracker.tsx` | Milestones object, progress % |
-| Contact Discovery | `ContactDiscovery.tsx` | `contacts: Contact[]` |
-| Outreach Builder | `OutreachBuilder.tsx` | Message draft, selected contact |
-| Follow-up Scheduler | `FollowUpScheduler.tsx` | Follow-up date, message |
-| Interview Mode | `InterviewMode.tsx` | Interview date, prep status |
-| Outcome Section | `OutcomeSection.tsx` | Outcome type, reflection |
-| Pitch Deck Panel | `PitchDeckPanel.tsx` | (Placeholder content) |
-| Flash Cards Panel | `FlashCardsPanel.tsx` | (Placeholder content) |
-| Notes & Attachments | `NotesAttachments.tsx` | Notes text, tags, files |
-| Activity Timeline | `ActivityTimeline.tsx` | `activities: ActivityItem[]` |
+| Section | Component | Data Required | Status |
+|---------|-----------|---------------|--------|
+| Back Button | Inline | None | ✅ Active |
+| Job Header | Inline | Job title, company, deadline, URL, status | ✅ Active |
+| Description | Inline | Job description (collapsible) | ✅ Active |
+| Progress Tracker | `ProgressTracker.tsx` | Milestones object, progress % | ✅ Active |
+| Contact Discovery | `ContactDiscovery.tsx` | `contacts: Contact[]` | ✅ Active |
+| Outreach Builder | `OutreachBuilder.tsx` | Message draft, selected contact | ✅ Active |
+| Follow-up Scheduler | `FollowUpScheduler.tsx` | Follow-up date, message | ✅ Active |
+| Interview Mode | `InterviewMode.tsx` | Interview date, prep status | ⏸️ **POSTPONED** |
+| Outcome Section | `OutcomeSection.tsx` | Outcome type, reflection | ✅ Active |
+| Notes & Attachments | `NotesAttachments.tsx` | Notes text, tags, files | ✅ Active |
+| Activity Timeline | `ActivityTimeline.tsx` | `activities: ActivityItem[]` | ✅ Active |
+| Pitch Deck Panel | `PitchDeckPanel.tsx` | (Placeholder) | ⏸️ Future |
+| Flash Cards Panel | `FlashCardsPanel.tsx` | (Placeholder) | ⏸️ Future |
 
-#### User Actions
+#### Core User Actions (Outreach Flow)
 
 | Action | Behavior | Backend Need |
 |--------|----------|--------------|
-| Change status dropdown | Update job status | `PATCH /jobs/:id` |
-| Toggle milestone checkbox | Update milestone | `PATCH /jobs/:id/milestones` |
+| **Find Contacts** | Trigger contact discovery | `POST /jobs/:id/discover-contacts` |
 | Select contact | Set `selectedContactId` | `PATCH /jobs/:id` |
+| **Generate Outreach** | AI-generate message | `POST /jobs/:id/generate-outreach` |
 | Edit outreach message | Update draft | `PATCH /jobs/:id/outreach` |
 | Copy message | Copy to clipboard | None |
-| Mark as Sent | Update `outreachMarkedSent` | `PATCH /jobs/:id` |
+| **Mark as Sent** | Update `outreachMarkedSent` | `PATCH /jobs/:id` |
 | Set follow-up date | Update follow-up | `PATCH /jobs/:id/followup` |
 | Mark follow-up sent | Update follow-up | `PATCH /jobs/:id/followup` |
-| Set interview date | Update interview | `PATCH /jobs/:id/interview` |
-| Complete prep day | Update milestone | `PATCH /jobs/:id/milestones` |
 | Record outcome | Update outcome | `PATCH /jobs/:id/outcome` |
 | Add note | Save notes | `PATCH /jobs/:id/notes` |
 | Add/remove tag | Update tags array | `PATCH /jobs/:id/tags` |
-| Upload attachment | Upload file | `POST /jobs/:id/attachments` |
-| Click "Clone job" | Duplicate job setup | `POST /jobs` |
 
 #### Validation Rules
 
@@ -343,106 +320,12 @@ Comprehensive detail page for a single job with all management tools.
 | Status | Must be valid `JobStatus` enum |
 | Outreach message | Max 2000 characters |
 | Follow-up date | Must be future date |
-| Interview date | Must be future date or today |
 | Notes | Max 5000 characters |
 | Tags | Max 10 tags, each max 30 chars |
-| Reflection | Max 1000 characters |
-
-#### Error Messages
-
-| Error | Message |
-|-------|---------|
-| Job not found | "Job not found" (currently shown) |
-| Save failed | "Failed to save changes. Please try again." |
-| File too large | "File must be under 10MB" |
-| Invalid file type | "Only PDF, DOC, DOCX, and images allowed" |
-
-#### Loading/Empty States
-- **Current:** "Job not found" if ID doesn't match
-- **Needed:** 
-  - Loading skeleton while fetching
-  - "No contacts found" in contact discovery
-  - "No activity yet" in timeline (implemented)
 
 ---
 
-### 3.5 Calendar — `/calendar`
-
-**File:** `src/pages/Calendar.tsx`
-
-#### Purpose
-Calendar view showing all job-related events, interviews, follow-ups, and personal items.
-
-#### UI Sections/Components
-
-| Section | Component | Data Required |
-|---------|-----------|---------------|
-| Main Sidebar | `Sidebar.tsx` | Nav items |
-| Calendar Sidebar | `CalendarSidebar.tsx` | Mini calendar, filters, create button |
-| Calendar Header | `CalendarHeader.tsx` | Date navigation, view toggle, search |
-| Month View | `MonthView.tsx` | Events for visible month |
-| Week View | `WeekView.tsx` | Events for visible week |
-| Day View | `DayView.tsx` | Events for selected day |
-| Agenda View | `AgendaView.tsx` | List of upcoming events |
-| Event Details Panel | `EventDetailsPanel.tsx` | Selected event data |
-
-#### Event Types
-
-| Type | Color | Description |
-|------|-------|-------------|
-| `job` | Blue | Job application deadlines |
-| `outreach` | Green | Outreach send dates |
-| `interview` | Purple | Interview appointments |
-| `coffee-chat` | Orange | Networking meetings |
-| `follow-up` | Yellow | Follow-up reminders |
-| `relationship` | Pink | Relationship check-ins |
-| `personal` | Cyan | Personal events |
-
-#### User Actions
-
-| Action | Behavior | Backend Need |
-|--------|----------|--------------|
-| Navigate month/week/day | Change visible date range | None (local) |
-| Toggle view mode | Switch Month/Week/Day/Agenda | None (local) |
-| Click "Today" | Jump to current date | None |
-| Toggle event type filter | Show/hide event types | None (local) |
-| Search events | Filter by title | Local or API |
-| Click event | Open details panel | None |
-| Click "Create Event" | Open new event panel | None |
-| Save event | Create/update event | `POST/PATCH /events` |
-| Delete event | Remove event | `DELETE /events/:id` |
-
-#### Calendar Event Fields
-
-| Field | Type | Required |
-|-------|------|----------|
-| `id` | string | Yes |
-| `title` | string | Yes |
-| `type` | CalendarEventType | Yes |
-| `startDateTime` | Date | Yes |
-| `endDateTime` | Date | Yes |
-| `allDay` | boolean | Yes |
-| `recurrenceRule` | enum | Yes |
-| `reminders` | array | No |
-| `linkedJobId` | string | No |
-| `linkedContactId` | string | No |
-| `notes` | string | No |
-| `suggestedMessageTemplate` | string | No |
-| `status` | enum | Yes |
-| `timezone` | string | Yes |
-
-#### Validation Rules
-
-| Field | Rule |
-|-------|------|
-| Title | Required, max 100 chars |
-| Start date | Required, valid date |
-| End date | Required, must be ≥ start date |
-| Reminder | Minutes before must be ≥ 0 |
-
----
-
-### 3.6 Not Found — `/*`
+### 3.5 Not Found — `/*`
 
 **File:** `src/pages/NotFound.tsx`
 
@@ -460,8 +343,8 @@ Simple 404 page with link back to home.
 | **Appears** | Jobs page (Kanban board) |
 | **Data Needed** | `Job` object |
 | **Events Triggered** | Navigate to detail, move to column, drag-drop |
-| **Configurable** | None currently |
-| **Hardcoded** | None |
+| **Displays** | Title, company, tags, progress, "Next Step" button |
+| **Removed** | ~~Fit Score badge~~, ~~Work Mode badge~~, ~~Role Family badge~~ |
 
 ### 4.2 Inbox Row (`InboxRow.tsx`)
 
@@ -471,72 +354,44 @@ Simple 404 page with link back to home.
 | **Appears** | Inbox page, Dashboard inbox preview |
 | **Data Needed** | `InboxAction` object |
 | **Events Triggered** | Start (navigate), Snooze, Mark Done |
-| **Configurable** | `compact` mode (boolean) |
-| **Hardcoded** | Icon/color mappings |
 
-### 4.3 Progress Tracker (`ProgressTracker.tsx`)
-
-| Property | Description |
-|----------|-------------|
-| **Purpose** | Visual milestone checklist |
-| **Appears** | Job Detail page |
-| **Data Needed** | `milestones` object, `progress` number |
-| **Events Triggered** | `onToggle(key)` for each milestone |
-| **Configurable** | Milestone labels |
-| **Hardcoded** | Milestone keys and labels |
-
-### 4.4 Contact Discovery (`ContactDiscovery.tsx`)
+### 4.3 Contact Discovery (`ContactDiscovery.tsx`)
 
 | Property | Description |
 |----------|-------------|
 | **Purpose** | List and select contacts for outreach |
 | **Appears** | Job Detail page |
 | **Data Needed** | `contacts: Contact[]` |
-| **Events Triggered** | Select contact |
-| **Configurable** | None |
-| **Hardcoded** | Confidence colors |
+| **Key Feature** | "Find Contacts" button triggers AI/scraping to discover contacts |
+| **Events Triggered** | Select contact, refresh contacts |
 
-### 4.5 Outreach Builder (`OutreachBuilder.tsx`)
+### 4.4 Outreach Builder (`OutreachBuilder.tsx`)
 
 | Property | Description |
 |----------|-------------|
 | **Purpose** | Draft and send outreach messages |
 | **Appears** | Job Detail page |
-| **Data Needed** | Message draft, selected contact name |
-| **Events Triggered** | Copy, Mark as Sent |
-| **Configurable** | Message template |
-| **Hardcoded** | Default message template |
+| **Data Needed** | Message draft, selected contact name, job context |
+| **Key Feature** | "Generate Outreach" button creates personalized message |
+| **Events Triggered** | Generate, Copy, Mark as Sent |
 
-### 4.6 Follow-up Scheduler (`FollowUpScheduler.tsx`)
+### 4.5 Follow-up Scheduler (`FollowUpScheduler.tsx`)
 
 | Property | Description |
 |----------|-------------|
 | **Purpose** | Schedule and track follow-up messages |
-| **Appears** | Job Detail page |
+| **Appears** | Job Detail page (after outreach sent) |
 | **Data Needed** | Follow-up date, message |
 | **Events Triggered** | Copy, Mark as Sent |
-| **Configurable** | Follow-up message template |
-| **Hardcoded** | Default follow-up template, "5 days" countdown |
 
-### 4.7 Interview Mode (`InterviewMode.tsx`)
+### 4.6 Progress Tracker (`ProgressTracker.tsx`)
 
 | Property | Description |
 |----------|-------------|
-| **Purpose** | 3-day interview preparation workflow |
-| **Appears** | Job Detail page (when status = "Interviewing") |
-| **Data Needed** | Interview date, day completion status |
-| **Events Triggered** | Set date, toggle reminders, complete day |
-| **Configurable** | Day plan tasks |
-| **Hardcoded** | 3-day plan with fixed tasks |
-
-### 4.8 Calendar Views
-
-| Component | Purpose |
-|-----------|---------|
-| `MonthView.tsx` | Monthly grid calendar |
-| `WeekView.tsx` | Weekly column view |
-| `DayView.tsx` | Single day detailed view |
-| `AgendaView.tsx` | List of upcoming events |
+| **Purpose** | Visual milestone checklist for outreach journey |
+| **Appears** | Job Detail page |
+| **Data Needed** | `milestones` object, `progress` number |
+| **Milestones Tracked** | Resume tailored, Contact selected, Outreach sent, Follow-up sent, Reply received, Meeting scheduled, Outcome recorded |
 
 ---
 
@@ -569,26 +424,25 @@ interface User {
 interface Job {
   id: string;                    // UUID
   userId: string;                // FK to User (required)
+  
+  // Core fields (extracted from LinkedIn URL)
   title: string;                 // Required
   company: string;               // Required
+  url: string;                   // Original LinkedIn job URL
+  description?: string;          // Job description (scraped)
   companyLogoUrl?: string;       // Optional
-  url: string;                   // Job posting URL
-  description?: string;          // Job description
   dueDate?: string;              // Application deadline
-  status: JobStatus;             // Required, enum
-  progress: number;              // 0-100, calculated
   
-  // Tracking flags
+  // Pipeline tracking
+  status: JobStatus;             // Required, enum
+  progress: number;              // 0-100, calculated from milestones
+  
+  // Outreach tracking flags
   hasSelectedContact: boolean;
   hasOutreachDraft: boolean;
   outreachMarkedSent: boolean;
   
-  // Optional fields (removed from filter UI)
-  fitScore?: 'High' | 'Medium' | 'Low';
-  workMode?: 'Remote' | 'Hybrid' | 'On-site';
-  roleFamily?: 'PM' | 'SWE' | 'DS' | 'Design' | 'Other';
-  
-  // Relations (can be embedded or separate tables)
+  // Relations
   selectedContactId?: string;
   notes?: string;
   tags?: string[];
@@ -622,11 +476,13 @@ interface JobMilestone {
   outreachSent: boolean;
   followUpSent: boolean;
   replyReceived: boolean;
-  interviewScheduled: boolean;
-  interviewPrep1: boolean;
-  interviewPrep2: boolean;
-  interviewPrep3: boolean;
+  interviewScheduled: boolean;   // Kept for future use
   outcomeRecorded: boolean;
+  
+  // Interview prep milestones POSTPONED
+  // interviewPrep1: boolean;
+  // interviewPrep2: boolean;
+  // interviewPrep3: boolean;
 }
 ```
 
@@ -637,12 +493,12 @@ interface Contact {
   id: string;                    // UUID
   jobId: string;                 // FK to Job
   name: string;                  // Required
-  title: string;                 // Job title
+  title: string;                 // Job title at company
   relationship: 'Recruiter' | 'Hiring Manager' | 'Team Lead' | 'Employee';
-  confidence: 'High' | 'Medium' | 'Low';
-  source: string;                // e.g., 'LinkedIn'
-  profileUrl?: string;           // LinkedIn profile, etc.
-  isSelected: boolean;           // Is this the selected contact?
+  confidence: 'High' | 'Medium' | 'Low';  // How confident we are this is right person
+  source: string;                // e.g., 'LinkedIn', 'Company Website'
+  profileUrl?: string;           // LinkedIn profile URL
+  isSelected: boolean;           // Is this the selected contact for outreach?
   createdAt: Date;
 }
 ```
@@ -662,37 +518,17 @@ interface OutreachMessage {
 }
 ```
 
-#### CalendarEvent
+#### FollowUp
 
 ```typescript
-interface CalendarEvent {
+interface FollowUp {
   id: string;                    // UUID
-  userId: string;                // FK to User
-  title: string;                 // Required
-  type: CalendarEventType;       // Required
-  startDateTime: Date;           // Required
-  endDateTime: Date;             // Required
-  allDay: boolean;
-  recurrenceRule: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
-  reminders: { minutesBefore: number }[];
-  linkedJobId?: string;          // FK to Job
-  linkedContactId?: string;      // FK to Contact
-  notes?: string;
-  suggestedMessageTemplate?: string;
-  status: 'scheduled' | 'done' | 'canceled';
-  timezone: string;
-  createdAt: Date;
-  updatedAt: Date;
+  jobId: string;                 // FK to Job
+  recommendedDate: Date;         // When to follow up
+  message: string;               // Follow-up message content
+  sent: boolean;
+  sentAt?: Date;
 }
-
-type CalendarEventType = 
-  | 'job'
-  | 'outreach'
-  | 'interview'
-  | 'coffee-chat'
-  | 'follow-up'
-  | 'relationship'
-  | 'personal';
 ```
 
 #### ActivityLog
@@ -703,27 +539,11 @@ interface ActivityLog {
   jobId: string;                 // FK to Job
   action: string;                // Description of action
   timestamp: Date;
-  createdBy?: string;            // 'user' | 'system'
+  createdBy: 'user' | 'system';
 }
 ```
 
-#### Attachment (Future)
-
-```typescript
-interface Attachment {
-  id: string;                    // UUID
-  jobId: string;                 // FK to Job
-  fileName: string;
-  fileType: string;              // MIME type
-  fileSize: number;              // Bytes
-  storageUrl: string;            // Cloud storage URL
-  uploadedAt: Date;
-}
-```
-
-#### InboxAction (Derived/Computed)
-
-This is NOT stored in database. It's computed from Job data:
+#### InboxAction (Computed, NOT stored)
 
 ```typescript
 interface InboxAction {
@@ -734,10 +554,8 @@ interface InboxAction {
   linkedJobId: string;
   companyName: string;
   roleTitle: string;
-  sequenceTotal?: number;
-  sequenceCurrent?: number;
-  isCompleted: boolean;          // Could be persisted if needed
-  isSnoozed: boolean;            // Could be persisted if needed
+  isCompleted: boolean;
+  isSnoozed: boolean;
   category: 'priority' | 'waiting' | 'setup';
 }
 ```
@@ -747,7 +565,7 @@ interface InboxAction {
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                          User                                 │
-│  has many: Jobs, CalendarEvents                              │
+│  has many: Jobs                                              │
 └──────────────────────────────────────────────────────────────┘
            │
            │ 1:N
@@ -755,10 +573,8 @@ interface InboxAction {
 ┌──────────────────────────────────────────────────────────────┐
 │                          Job                                  │
 │  belongs to: User                                            │
-│  has one: JobMilestone                                       │
-│  has many: Contacts, OutreachMessages, ActivityLogs,         │
-│            Attachments                                       │
-│  may link to: CalendarEvents                                 │
+│  has one: JobMilestone, FollowUp                             │
+│  has many: Contacts, OutreachMessages, ActivityLogs          │
 └──────────────────────────────────────────────────────────────┘
            │
      ┌─────┴─────┬──────────────┬───────────────┐
@@ -775,56 +591,387 @@ interface InboxAction {
 | Rule | Description |
 |------|-------------|
 | One selected contact per job | Only one contact can be `isSelected = true` per job |
-| Progress auto-calculation | Progress = (completed milestones / 10) * 100 |
-| Status triggers | Certain milestones update status automatically (optional) |
+| Progress auto-calculation | Progress = (completed milestones / total milestones) * 100 |
 | Follow-up scheduling | Default 5 days after outreach sent |
-| Interview prep | Only visible when status = "Interviewing" |
 | Activity logging | Auto-log status changes, milestone completions |
+| Job creation | Only via URL paste + scraping (not manual entry) |
 
 ---
 
-## 6. API Contract Draft
+## 6. Recommended Database Structure
 
-### 6.1 Authentication Endpoints
+This section provides the **recommended database schema** for implementation.
+
+### 6.1 SQL Schema (PostgreSQL/Supabase)
+
+```sql
+-- ============================================
+-- ENUMS
+-- ============================================
+
+CREATE TYPE job_status AS ENUM (
+  'Interested',
+  'Outreach Ready',
+  'Outreach Sent',
+  'Replied',
+  'Meeting Booked',
+  'Interviewing',
+  'Offer',
+  'Closed'
+);
+
+CREATE TYPE contact_relationship AS ENUM (
+  'Recruiter',
+  'Hiring Manager',
+  'Team Lead',
+  'Employee'
+);
+
+CREATE TYPE confidence_level AS ENUM (
+  'High',
+  'Medium',
+  'Low'
+);
+
+CREATE TYPE message_type AS ENUM (
+  'initial',
+  'followup'
+);
+
+CREATE TYPE outcome_type AS ENUM (
+  'Offer',
+  'Rejected',
+  'Withdrew',
+  'No response'
+);
+
+-- ============================================
+-- TABLES
+-- ============================================
+
+-- Users table (extends Supabase auth.users)
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT UNIQUE NOT NULL,
+  name TEXT NOT NULL,
+  username TEXT UNIQUE,
+  avatar_url TEXT,
+  daily_goal INTEGER DEFAULT 5,
+  timezone TEXT DEFAULT 'America/New_York',
+  email_notifications BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Jobs table
+CREATE TABLE public.jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  
+  -- Core fields (from LinkedIn scraping)
+  title TEXT NOT NULL,
+  company TEXT NOT NULL,
+  url TEXT NOT NULL,
+  description TEXT,
+  company_logo_url TEXT,
+  due_date DATE,
+  
+  -- Pipeline tracking
+  status job_status NOT NULL DEFAULT 'Interested',
+  progress INTEGER DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
+  
+  -- Outreach flags
+  has_selected_contact BOOLEAN DEFAULT false,
+  has_outreach_draft BOOLEAN DEFAULT false,
+  outreach_marked_sent BOOLEAN DEFAULT false,
+  
+  -- Additional data
+  selected_contact_id UUID,
+  notes TEXT,
+  tags TEXT[] DEFAULT '{}',
+  outcome outcome_type,
+  outcome_reflection TEXT,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Job Milestones table
+CREATE TABLE public.job_milestones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID UNIQUE NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  
+  resume_tailored BOOLEAN DEFAULT false,
+  contact_selected BOOLEAN DEFAULT false,
+  outreach_sent BOOLEAN DEFAULT false,
+  follow_up_sent BOOLEAN DEFAULT false,
+  reply_received BOOLEAN DEFAULT false,
+  interview_scheduled BOOLEAN DEFAULT false,
+  outcome_recorded BOOLEAN DEFAULT false,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Contacts table
+CREATE TABLE public.contacts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  
+  name TEXT NOT NULL,
+  title TEXT,
+  relationship contact_relationship,
+  confidence confidence_level DEFAULT 'Medium',
+  source TEXT DEFAULT 'LinkedIn',
+  profile_url TEXT,
+  is_selected BOOLEAN DEFAULT false,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Outreach Messages table
+CREATE TABLE public.outreach_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  contact_id UUID REFERENCES public.contacts(id) ON DELETE SET NULL,
+  
+  message TEXT NOT NULL,
+  type message_type NOT NULL DEFAULT 'initial',
+  sent_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Follow-ups table
+CREATE TABLE public.follow_ups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID UNIQUE NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  
+  recommended_date DATE NOT NULL,
+  message TEXT,
+  sent BOOLEAN DEFAULT false,
+  sent_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Activity Logs table
+CREATE TABLE public.activity_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID NOT NULL REFERENCES public.jobs(id) ON DELETE CASCADE,
+  
+  action TEXT NOT NULL,
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  created_by TEXT DEFAULT 'user' CHECK (created_by IN ('user', 'system'))
+);
+
+-- Inbox Action State table (for snooze/complete persistence)
+CREATE TABLE public.inbox_action_states (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  action_key TEXT NOT NULL,  -- e.g., "job123-FIND_CONTACTS"
+  
+  is_snoozed BOOLEAN DEFAULT false,
+  snoozed_until TIMESTAMPTZ,
+  is_completed BOOLEAN DEFAULT false,
+  completed_at TIMESTAMPTZ,
+  
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  UNIQUE(user_id, action_key)
+);
+
+-- ============================================
+-- INDEXES
+-- ============================================
+
+CREATE INDEX idx_jobs_user_id ON public.jobs(user_id);
+CREATE INDEX idx_jobs_status ON public.jobs(status);
+CREATE INDEX idx_jobs_created_at ON public.jobs(created_at DESC);
+CREATE INDEX idx_contacts_job_id ON public.contacts(job_id);
+CREATE INDEX idx_outreach_messages_job_id ON public.outreach_messages(job_id);
+CREATE INDEX idx_activity_logs_job_id ON public.activity_logs(job_id);
+CREATE INDEX idx_inbox_states_user_id ON public.inbox_action_states(user_id);
+
+-- ============================================
+-- ROW LEVEL SECURITY (RLS)
+-- ============================================
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.jobs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.job_milestones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.outreach_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.follow_ups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inbox_action_states ENABLE ROW LEVEL SECURITY;
+
+-- Profiles: users can only access their own profile
+CREATE POLICY "Users can view own profile"
+  ON public.profiles FOR SELECT
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile"
+  ON public.profiles FOR UPDATE
+  USING (auth.uid() = id);
+
+-- Jobs: users can only access their own jobs
+CREATE POLICY "Users can view own jobs"
+  ON public.jobs FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own jobs"
+  ON public.jobs FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own jobs"
+  ON public.jobs FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own jobs"
+  ON public.jobs FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Similar policies for all other tables...
+-- (Contacts, Milestones, Messages, etc. follow same pattern via job_id -> user_id)
+
+-- ============================================
+-- TRIGGERS
+-- ============================================
+
+-- Auto-create profile on user signup
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, name)
+  VALUES (NEW.id, NEW.email, COALESCE(NEW.raw_user_meta_data->>'name', 'User'));
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- Auto-create milestones when job is created
+CREATE OR REPLACE FUNCTION public.handle_new_job()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.job_milestones (job_id)
+  VALUES (NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_job_created
+  AFTER INSERT ON public.jobs
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_job();
+
+-- Auto-update updated_at timestamp
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON public.jobs
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+
+CREATE TRIGGER set_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
+```
+
+### 6.2 Collections Summary
+
+| Collection/Table | Purpose | Primary Key | Foreign Keys |
+|------------------|---------|-------------|--------------|
+| `profiles` | User profiles | `id` (from auth.users) | - |
+| `jobs` | Job opportunities | `id` | `user_id` → profiles |
+| `job_milestones` | Progress tracking | `id` | `job_id` → jobs |
+| `contacts` | Outreach contacts | `id` | `job_id` → jobs |
+| `outreach_messages` | Message drafts/sent | `id` | `job_id` → jobs, `contact_id` → contacts |
+| `follow_ups` | Follow-up scheduling | `id` | `job_id` → jobs |
+| `activity_logs` | Audit trail | `id` | `job_id` → jobs |
+| `inbox_action_states` | Snooze/complete state | `id` | `user_id` → profiles |
+
+### 6.3 Key Database Considerations
+
+1. **UUID everywhere** — Use UUIDs for all primary keys
+2. **Soft delete optional** — Could add `deleted_at` column if undo is needed
+3. **RLS is critical** — Every table needs row-level security
+4. **Cascade deletes** — When job deleted, all related data deleted
+5. **No file storage in DB** — Use Supabase Storage for attachments (future)
+
+---
+
+## 7. API Contract Draft
+
+### 7.1 Authentication Endpoints
 
 ```
 POST   /auth/signup           Create new account
 POST   /auth/login            Login with email/password
 POST   /auth/logout           End session
 POST   /auth/refresh          Refresh access token
-POST   /auth/forgot-password  Request password reset
-POST   /auth/reset-password   Set new password
 GET    /auth/me               Get current user
 ```
 
-### 6.2 User Endpoints
+### 7.2 User Endpoints
 
 ```
 GET    /users/me              Get current user profile
 PATCH  /users/me              Update user profile
-DELETE /users/me              Delete account
 ```
 
-### 6.3 Job Endpoints
+### 7.3 Job Endpoints
+
+#### Create Job from URL (Core Feature)
+```
+POST /jobs
+
+Body:
+{
+  url: string     // LinkedIn job posting URL (REQUIRED)
+}
+
+Backend Process:
+1. Validate URL is a LinkedIn job posting
+2. Scrape page content using Firecrawl or similar
+3. Extract: title, company, description, logo, deadline
+4. Create job record with status "Interested"
+5. Auto-create empty milestones record
+6. Log activity: "Job added"
+
+Response: { job: Job }
+
+Auth: Required
+Errors:
+- 400 Invalid URL
+- 400 Could not extract job data
+- 422 URL scraping failed
+```
 
 #### List Jobs
 ```
 GET /jobs
 
 Query params:
-- status: JobStatus (optional, filter by status)
+- status: JobStatus (optional)
 - search: string (optional, search title/company)
-- sort: 'created' | 'updated' | 'dueDate' (default: 'updated')
-- order: 'asc' | 'desc' (default: 'desc')
-- limit: number (default: 50, max: 100)
+- limit: number (default: 50)
 - offset: number (default: 0)
 
 Response:
 {
   jobs: Job[],
-  total: number,
-  limit: number,
-  offset: number
+  total: number
 }
 
 Auth: Required
@@ -840,35 +987,11 @@ Response:
   milestones: JobMilestone,
   contacts: Contact[],
   outreachMessages: OutreachMessage[],
+  followUp: FollowUp | null,
   activityTimeline: ActivityLog[]
 }
 
 Auth: Required
-Errors:
-- 404 Job not found
-- 403 Not authorized
-```
-
-#### Create Job
-```
-POST /jobs
-
-Body:
-{
-  title: string,              // Required
-  company: string,            // Required
-  url: string,                // Required
-  description?: string,
-  dueDate?: string,
-  status?: JobStatus,         // Default: 'Interested'
-  tags?: string[]
-}
-
-Response: { job: Job }
-
-Auth: Required
-Errors:
-- 400 Validation error
 ```
 
 #### Update Job
@@ -877,13 +1000,7 @@ PATCH /jobs/:id
 
 Body (all optional):
 {
-  title?: string,
-  company?: string,
-  url?: string,
-  description?: string,
-  dueDate?: string,
   status?: JobStatus,
-  fitScore?: FitScore,
   selectedContactId?: string,
   notes?: string,
   tags?: string[],
@@ -894,9 +1011,6 @@ Body (all optional):
 Response: { job: Job }
 
 Auth: Required
-Errors:
-- 404 Not found
-- 400 Validation error
 ```
 
 #### Delete Job
@@ -906,11 +1020,58 @@ DELETE /jobs/:id
 Response: { success: true }
 
 Auth: Required
-Errors:
-- 404 Not found
 ```
 
-#### Update Milestones
+### 7.4 Contact Discovery Endpoint
+
+```
+POST /jobs/:id/discover-contacts
+
+Purpose: Use AI/scraping to find potential contacts at the company
+
+Response:
+{
+  contacts: Contact[]   // Newly discovered contacts
+}
+
+Backend Process:
+1. Get company name from job
+2. Search LinkedIn/company website for relevant people
+3. Score contacts by relevance (Recruiter > HM > Employee)
+4. Save contacts to database
+5. Log activity: "Contacts discovered"
+
+Auth: Required
+```
+
+### 7.5 Outreach Generation Endpoint
+
+```
+POST /jobs/:id/generate-outreach
+
+Body:
+{
+  contactId: string,
+  type: 'initial' | 'followup'
+}
+
+Response:
+{
+  message: OutreachMessage
+}
+
+Backend Process:
+1. Get job details, contact info, user profile
+2. Generate personalized message using AI
+3. Save as draft (sentAt = null)
+4. Update job: hasOutreachDraft = true
+5. Log activity: "Outreach draft created"
+
+Auth: Required
+```
+
+### 7.6 Milestone Endpoints
+
 ```
 PATCH /jobs/:id/milestones
 
@@ -921,10 +1082,6 @@ Body:
   outreachSent?: boolean,
   followUpSent?: boolean,
   replyReceived?: boolean,
-  interviewScheduled?: boolean,
-  interviewPrep1?: boolean,
-  interviewPrep2?: boolean,
-  interviewPrep3?: boolean,
   outcomeRecorded?: boolean
 }
 
@@ -933,50 +1090,7 @@ Response: { milestones: JobMilestone, progress: number }
 Auth: Required
 ```
 
-### 6.4 Contact Endpoints
-
-```
-GET    /jobs/:jobId/contacts              List contacts for job
-POST   /jobs/:jobId/contacts              Add contact
-PATCH  /jobs/:jobId/contacts/:contactId   Update contact
-DELETE /jobs/:jobId/contacts/:contactId   Remove contact
-POST   /jobs/:jobId/contacts/:contactId/select   Set as selected contact
-```
-
-### 6.5 Outreach Endpoints
-
-```
-GET    /jobs/:jobId/outreach              Get outreach messages
-POST   /jobs/:jobId/outreach              Create/save draft
-PATCH  /jobs/:jobId/outreach/:id          Update message
-POST   /jobs/:jobId/outreach/:id/send     Mark as sent
-```
-
-### 6.6 Calendar Event Endpoints
-
-```
-GET    /events                 List events (with date range filter)
-POST   /events                 Create event
-GET    /events/:id             Get event
-PATCH  /events/:id             Update event
-DELETE /events/:id             Delete event
-
-Query params for GET /events:
-- start: ISO date string (required)
-- end: ISO date string (required)
-- type: CalendarEventType (optional, filter)
-- linkedJobId: string (optional, filter)
-```
-
-### 6.7 Activity Log Endpoints
-
-```
-GET /jobs/:jobId/activity      List activity for job
-
-Response: { activities: ActivityLog[] }
-```
-
-### 6.8 Dashboard/Analytics Endpoints
+### 7.7 Dashboard Stats Endpoint
 
 ```
 GET /dashboard/stats
@@ -985,267 +1099,155 @@ Response:
 {
   dailyGoal: number,
   completedToday: number,
-  coffeeChatsTotal: number,
-  interviewsTotal: number,
-  tasksTotal: number,
-  tasksCompleted: number,
+  coffeeChatsTotal: number,     // Jobs where status reached "Meeting Booked"
+  interviewsTotal: number,      // Jobs where status = "Interviewing"
+  tasksTotal: number,           // Count of pending inbox actions
+  tasksCompleted: number,       // Count of completed actions
   jobsByStatus: { [status: string]: number }
 }
 
 Auth: Required
 ```
 
-### 6.9 Error Response Format
+### 7.8 Error Response Format
 
 ```json
 {
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "Title is required",
+    "message": "URL is required",
     "details": {
-      "field": "title",
+      "field": "url",
       "constraint": "required"
     }
   }
 }
 ```
 
-| Status Code | Meaning |
-|-------------|---------|
-| 200 | Success |
-| 201 | Created |
-| 400 | Bad Request (validation) |
-| 401 | Unauthorized (not logged in) |
-| 403 | Forbidden (not owner) |
-| 404 | Not Found |
-| 500 | Internal Server Error |
-
 ---
 
-## 7. State & Hardcoded Data Replacement
+## 8. State & Hardcoded Data Replacement
 
-### 7.1 Hardcoded Data Locations
+### 8.1 Hardcoded Data Locations
 
 | File | Hardcoded Data | Replace With |
 |------|----------------|--------------|
 | `src/data/jobs.ts` | `sampleJobs[]` array with 8 fake jobs | `GET /jobs` API response |
-| `src/data/calendarEvents.ts` | `mockCalendarEvents[]` | `GET /events` API response |
-| `src/pages/Index.tsx` | `goal={5}`, `completed={2}`, `coffeeChats={8}`, `interviews={3}`, `totalTasks={12}`, `completedTasks={7}` | `GET /dashboard/stats` |
-| `src/components/Header.tsx` | User name "Kacie Velasquez", username "@k_velasquez", hardcoded avatar URL | Authenticated user from `GET /auth/me` |
-| `src/components/job-detail/OutreachBuilder.tsx` | Default message template | User template setting or API-generated template |
-| `src/components/job-detail/FollowUpScheduler.tsx` | Default follow-up message, hardcoded "5 days" | Calculated from outreach send date |
-| `src/components/job-detail/InterviewMode.tsx` | Fixed 3-day prep plan tasks | Could be configurable or AI-generated |
-| `src/components/inbox/InboxRow.tsx` | Icon/color mappings | OK to keep hardcoded (UI concern) |
-| `src/types/calendar.ts` | `EVENT_TYPE_COLORS`, `EVENT_TYPE_LABELS` | OK to keep hardcoded (UI concern) |
+| `src/pages/Index.tsx` | `goal={5}`, `completed={2}`, etc. | `GET /dashboard/stats` |
+| `src/components/Header.tsx` | User name, username, avatar | Authenticated user from `GET /auth/me` |
+| `src/components/job-detail/OutreachBuilder.tsx` | Default message template | AI-generated via `POST /jobs/:id/generate-outreach` |
+| `src/components/job-detail/FollowUpScheduler.tsx` | Default message, "5 days" | Calculated from outreach send date |
 
-### 7.2 State Management Recommendations
-
-Current state is local (`useState` in each page). For production:
+### 8.2 State Management Recommendations
 
 1. **React Query (TanStack Query)** — Already installed, use for:
-   - Fetching and caching jobs, events
+   - Fetching and caching jobs
    - Automatic refetching
    - Optimistic updates
 
 2. **Auth Context** — Create for:
    - Current user session
    - Login/logout functions
-   - Auth state across app
 
 3. **Keep Local State For:**
    - UI toggles (collapsed sections, hover states)
    - Form drafts (before save)
-   - Search input values
-   - Filter selections
-
-### 7.3 Migration Examples
-
-#### Before (hardcoded):
-```tsx
-// src/pages/Jobs.tsx
-import { sampleJobs } from "@/data/jobs";
-const [jobs, setJobs] = useState<Job[]>(sampleJobs);
-```
-
-#### After (API):
-```tsx
-// src/pages/Jobs.tsx
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
-const { data: jobs, isLoading, error } = useQuery({
-  queryKey: ['jobs'],
-  queryFn: () => fetch('/api/jobs').then(res => res.json())
-});
-
-const updateJobMutation = useMutation({
-  mutationFn: (update) => fetch(`/api/jobs/${update.id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(update)
-  }),
-  onSuccess: () => queryClient.invalidateQueries(['jobs'])
-});
-```
+   - Search/filter inputs
 
 ---
 
-## 8. Authentication & Authorization
+## 9. Authentication & Authorization
 
-### 8.1 Required Auth Flows
+### 9.1 Required Auth Flows
 
 | Flow | Description | Priority |
 |------|-------------|----------|
 | **Sign Up** | Email + password registration | High |
 | **Login** | Email + password authentication | High |
 | **Logout** | End session | High |
-| **Session Refresh** | Auto-refresh JWT tokens | High |
-| **Forgot Password** | Email-based password reset | Medium |
-| **OAuth (Google)** | Social login option | Low |
+| **Session Refresh** | Auto-refresh tokens | High |
 
-### 8.2 Protected Actions
+### 9.2 Protected Actions
 
 | Action | Auth Required | Owner Check |
 |--------|---------------|-------------|
 | View dashboard | Yes | N/A |
 | View jobs | Yes | Only own jobs |
 | Create job | Yes | N/A |
-| Edit job | Yes | Must be owner |
-| Delete job | Yes | Must be owner |
-| View calendar | Yes | Only own events |
-| Create event | Yes | N/A |
-| Edit event | Yes | Must be owner |
+| Edit/delete job | Yes | Must be owner |
 | Update profile | Yes | Self only |
-
-### 8.3 Role Behavior
-
-Currently single-role (Job Seeker). Future considerations:
-
-| Role | Permissions |
-|------|-------------|
-| Job Seeker | Full CRUD on own data |
-| Admin | Manage system settings, templates |
-| (Future) Coach | View assigned users' data |
-
-### 8.4 Auth Implementation Notes
-
-- Sidebar "Logout" button currently non-functional → must trigger logout flow
-- No login page exists → create `/auth` or `/login` route
-- No auth protection on routes → add `ProtectedRoute` wrapper
-- Store session in localStorage/cookies with secure flags
 
 ---
 
-## 9. Admin / CMS Needs
+## 10. Admin / CMS Needs
 
-### 9.1 Admin Features (Future Phase)
+### 10.1 Admin Features (Future Phase)
 
 | Feature | Description |
 |---------|-------------|
 | User Management | View users, disable accounts |
-| Analytics Dashboard | Aggregate usage stats |
-| System Settings | Default daily goal, feature flags |
-| Template Management | Email templates, outreach templates |
-| Feedback Review | User-submitted feedback |
-
-### 9.2 User-Editable Content
-
-| Content | Where Used | Storage |
-|---------|------------|---------|
-| Daily goal number | Dashboard goal card | User settings |
-| Outreach templates | Outreach builder | User settings or global templates |
-| Interview prep tasks | Interview mode | Could be user-customizable |
-| Custom tags | Job cards, notes | Per-job storage |
+| Template Management | Outreach message templates |
+| System Settings | Default goals, feature flags |
 
 ---
 
-## 10. Non-Functional Requirements
+## 11. Non-Functional Requirements
 
-### 10.1 Performance
+### 11.1 Performance
 
 | Requirement | Target |
 |-------------|--------|
-| Initial page load | < 2 seconds |
 | API response time | < 500ms p95 |
+| URL scraping | < 5 seconds |
 | Job list pagination | 50 items per page |
-| Calendar events | Fetch 3-month window |
-| Search debounce | 300ms delay |
 
-### 10.2 Security
+### 11.2 Security
 
 | Requirement | Implementation |
 |-------------|----------------|
 | Input validation | Server-side validation for all inputs |
-| SQL injection | Use parameterized queries/ORM |
-| XSS prevention | Sanitize user-generated content |
-| CSRF protection | CSRF tokens for state-changing requests |
+| URL validation | Validate LinkedIn job URLs before scraping |
 | Rate limiting | 100 requests/minute per user |
-| File uploads | Max 10MB, allowed types only |
-| Password rules | Min 8 chars, complexity requirements |
-| Session timeout | 7 days with refresh tokens |
-
-### 10.3 Logging / Audit
-
-| Event | What to Log |
-|-------|-------------|
-| Authentication | Login, logout, failed attempts |
-| Job changes | Status changes, outcome recorded |
-| Data deletion | Job deleted, account deleted |
-| Errors | Server errors with stack traces |
-
-### 10.4 Email Notifications (Future)
-
-| Trigger | Email |
-|---------|-------|
-| Follow-up due | "Time to follow up with [Company]" |
-| Interview tomorrow | "Interview prep reminder" |
-| Inactivity | "You haven't logged in for 7 days" |
-| Weekly summary | "Your job search this week" |
+| RLS | All tables have row-level security |
 
 ---
 
-## 11. Open Questions & Assumptions
+## 12. Open Questions & Assumptions
 
-### 11.1 Assumptions Made
+### 12.1 Assumptions Made
 
 1. **Single user per account** — No team/shared workspaces
-2. **All data is private** — No public profiles or sharing
-3. **English only** — No i18n/localization needed initially
-4. **US/Canada timezones** — Default timezone handling
-5. **Browser only** — No mobile app initially
-6. **No AI generation** — Templates are static (AI could be added)
+2. **LinkedIn focus** — Primary job source is LinkedIn URLs
+3. **No calendar integration** — Removed from scope
+4. **No interview prep** — Postponed to future version
 
-### 11.2 Open Questions for Product/Backend Team
+### 12.2 Open Questions
 
 | # | Question | Impact |
 |---|----------|--------|
-| 1 | Should outreach messages support rich text (bold, links)? | Message schema, editor component |
-| 2 | Should we auto-generate contacts from LinkedIn scraping? | API integration, legal considerations |
-| 3 | What happens to calendar events when a job is deleted? | Cascade delete or orphan? |
-| 4 | Should users be able to undo job deletion? | Soft delete vs hard delete |
-| 5 | Do we need webhook support for calendar sync (Google Calendar)? | Integration complexity |
-| 6 | Should daily stats reset at midnight user's timezone? | Stats calculation logic |
-| 7 | Is there a maximum number of jobs per user? | Storage/performance limits |
-| 8 | Should we track "time in stage" for jobs? | Analytics requirements |
-| 9 | Are attachments required? Can we defer to v2? | Scope reduction option |
-| 10 | Do we need email verification on signup? | Auth flow complexity |
+| 1 | What scraping service for LinkedIn jobs? | Firecrawl, Apify, custom? |
+| 2 | What AI service for outreach generation? | OpenAI, Anthropic, etc.? |
+| 3 | How to discover contacts? | LinkedIn Sales Nav, Apollo, manual? |
+| 4 | Should URL scraping happen sync or async? | UX decision |
+| 5 | Email notifications needed for MVP? | Scope |
 
-### 11.3 Recommended MVP Scope
+### 12.3 Recommended MVP Scope
 
 **Include in MVP:**
 - User auth (email/password)
-- Full Job CRUD
-- Job milestones
-- Contact management
-- Outreach tracking
-- Calendar events (basic)
+- Job creation via URL paste + scraping
+- Contact discovery (manual add initially, AI later)
+- Outreach message generation
+- Outreach/follow-up tracking
 - Dashboard stats
+- Kanban board visualization
 
 **Defer to v2:**
+- Interview prep mode
+- Calendar integration
 - File attachments
 - Email notifications
-- OAuth login
-- AI-generated content
-- Calendar integrations
-- Admin panel
+- AI contact discovery
 
 ---
 
@@ -1254,6 +1256,7 @@ Currently single-role (Job Seeker). Future considerations:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | Jan 2025 | Lovable AI | Initial document |
+| 1.1 | Jan 2025 | Lovable AI | Reframe as outreach tool, remove calendar, add database schema, clarify job input flow |
 
 ---
 
