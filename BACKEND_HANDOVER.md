@@ -1255,8 +1255,8 @@ Auth: Required
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
-| 1.0 | Jan 2025 | Lovable AI | Initial document |
-| 1.1 | Jan 2025 | Lovable AI | Reframe as outreach tool, remove calendar, add database schema, clarify job input flow |
+| 1.0 | Jan 2025 | Mohamed Hiba | Initial document |
+| 1.1 | Jan 2025 | Mohamed Hiba | Reframe as outreach tool, remove calendar, add database schema, clarify job input flow |
 
 ---
 
