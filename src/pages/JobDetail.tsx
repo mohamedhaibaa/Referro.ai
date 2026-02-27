@@ -10,7 +10,6 @@ import OutreachBuilder from "@/components/job-detail/OutreachBuilder";
 import FollowUpScheduler from "@/components/job-detail/FollowUpScheduler";
 import PitchDeckPanel from "@/components/job-detail/PitchDeckPanel";
 import FlashCardsPanel from "@/components/job-detail/FlashCardsPanel";
-import InterviewMode from "@/components/job-detail/InterviewMode";
 import NotesAttachments from "@/components/job-detail/NotesAttachments";
 import ActivityTimeline from "@/components/job-detail/ActivityTimeline";
 import OutcomeSection from "@/components/job-detail/OutcomeSection";
@@ -150,8 +149,6 @@ const JobDetail = () => {
             
             <FollowUpScheduler />
 
-            {status === "Interviewing" && <InterviewMode />}
-            
             <OutcomeSection />
           </div>
 
