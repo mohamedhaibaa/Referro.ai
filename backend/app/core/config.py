@@ -21,8 +21,7 @@ class Settings(BaseSettings):
     GAMMA_API_KEY: str = ""
     APPLICATION_INSIGHTS_CONNECTION_STRING: str = ""
 
-    class Config:
-        env_file = ".env"
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()
