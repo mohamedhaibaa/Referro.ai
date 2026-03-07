@@ -1,4 +1,3 @@
-import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import DailyGoalCard from "@/components/DailyGoalCard";
@@ -6,11 +5,12 @@ import MetricsCard from "@/components/MetricsCard";
 import TasksCard from "@/components/TasksCard";
 import InboxPreview from "@/components/inbox/InboxPreview";
 import JobsPreview from "@/components/jobs/JobsPreview";
-import { sampleJobs } from "@/data/jobs";
-import { Job } from "@/types/job";
+import { useJobs } from "@/hooks/useJobs";
+import { useDashboard } from "@/hooks/useDashboard";
 
 const Index = () => {
-  const [jobs] = useState<Job[]>(sampleJobs);
+  const { data: jobs = [] } = useJobs();
+  const { data: stats } = useDashboard();
 
   return (
     <div className="min-h-screen bg-background">
@@ -24,9 +24,9 @@ const Index = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-5 mb-6">
-          <DailyGoalCard goal={5} completed={2} />
-          <MetricsCard coffeeChats={8} interviews={3} />
-          <TasksCard totalTasks={12} completedTasks={7} />
+          <DailyGoalCard goal={5} completed={stats?.totalJobs ?? 0} />
+          <MetricsCard coffeeChats={stats?.meetings ?? 0} interviews={stats?.offers ?? 0} />
+          <TasksCard totalTasks={stats?.totalJobs ?? 0} completedTasks={stats?.outreachSent ?? 0} />
         </div>
 
         <div className="grid grid-cols-2 gap-5">

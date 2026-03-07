@@ -6,12 +6,13 @@ import InboxRow from "@/components/inbox/InboxRow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { sampleJobs } from "@/data/jobs";
 import { generateInboxActionsFromJobs, groupActionsByCategory } from "@/lib/inboxUtils";
 import { InboxAction } from "@/types/inbox";
 import { cn } from "@/lib/utils";
+import { useJobs } from "@/hooks/useJobs";
 
 const Inbox = () => {
+  const { data: jobs = [] } = useJobs();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
   const [snoozedIds, setSnoozedIds] = useState<Set<string>>(new Set());
@@ -21,12 +22,12 @@ const Inbox = () => {
   const [setupOpen, setSetupOpen] = useState(true);
 
   const allActions = useMemo(() => {
-    return generateInboxActionsFromJobs(sampleJobs).map((action) => ({
+    return generateInboxActionsFromJobs(jobs).map((action) => ({
       ...action,
       isSnoozed: snoozedIds.has(action.id),
       isCompleted: completedIds.has(action.id),
     }));
-  }, [snoozedIds, completedIds]);
+  }, [jobs, snoozedIds, completedIds]);
 
   const filteredActions = useMemo(() => {
     if (!searchQuery) return allActions;

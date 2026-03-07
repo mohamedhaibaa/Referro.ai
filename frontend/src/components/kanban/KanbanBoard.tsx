@@ -18,6 +18,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters, { FilterState } from "./KanbanFilters";
 import { cn } from "@/lib/utils";
+import { useCreateJob } from "@/hooks/useJobs";
 
 interface KanbanBoardProps {
   jobs: Job[];
@@ -25,6 +26,7 @@ interface KanbanBoardProps {
 }
 
 const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
+  const createJob = useCreateJob();
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
@@ -111,7 +113,7 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
 
   const handleCreateJob = () => {
     if (jobUrl.trim()) {
-      console.log("Creating job from URL:", jobUrl);
+      createJob.mutate({ url: jobUrl.trim() });
       setJobUrl("");
       setShowUrlInput(false);
     }
