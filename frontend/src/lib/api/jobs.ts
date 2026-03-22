@@ -93,3 +93,31 @@ export async function updateJob(id: string, patch: Partial<{
 export async function deleteJob(id: string): Promise<void> {
   await api.delete(`/jobs/${id}`);
 }
+
+export interface Milestones {
+  resumeTailored: boolean;
+  contactSelected: boolean;
+  outreachSent: boolean;
+  followUpSent: boolean;
+  replyReceived: boolean;
+  interviewScheduled: boolean;
+  interviewPrep1: boolean;
+  interviewPrep2: boolean;
+  interviewPrep3: boolean;
+  outcomeRecorded: boolean;
+}
+
+interface MilestonesResponse {
+  data: Milestones;
+  error: string | null;
+}
+
+export async function getMilestones(jobId: string): Promise<Milestones> {
+  const res = await api.get<MilestonesResponse>(`/jobs/${jobId}/milestones`);
+  return res.data;
+}
+
+export async function updateMilestones(jobId: string, patch: Partial<Milestones>): Promise<Milestones> {
+  const res = await api.patch<MilestonesResponse>(`/jobs/${jobId}/milestones`, patch);
+  return res.data;
+}

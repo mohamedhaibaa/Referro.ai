@@ -45,3 +45,23 @@ export function useDeleteJob() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
 }
+
+import { getMilestones, updateMilestones, Milestones } from "@/lib/api/jobs";
+
+export function useJobMilestones(jobId: string | undefined) {
+  return useQuery({
+    queryKey: ["milestones", jobId],
+    queryFn: () => getMilestones(jobId!),
+    enabled: !!jobId,
+  });
+}
+
+export function useUpdateMilestones(jobId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (patch: Partial<Milestones>) => updateMilestones(jobId, patch),
+    onSuccess: (updated) => {
+      qc.setQueryData(["milestones", jobId], updated);
+    },
+  });
+}
