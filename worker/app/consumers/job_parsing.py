@@ -62,7 +62,7 @@ async def _parse_with_ai(raw_text: str) -> dict:
     """Call Azure OpenAI to extract structured job data from raw page text."""
     url = (
         f"{settings.AI_FOUNDRY_ENDPOINT.rstrip('/')}"
-        "/openai/deployments/gpt-4o/chat/completions?api-version=2024-02-01"
+        f"/openai/deployments/{settings.AI_FOUNDRY_DEPLOYMENT}/chat/completions?api-version=2024-02-01"
     )
     headers = {
         "Content-Type": "application/json",

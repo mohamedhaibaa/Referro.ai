@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     SERVICE_BUS_CONNECTION_STRING: str
     AI_FOUNDRY_ENDPOINT: str = ""
     AI_FOUNDRY_API_KEY: str = ""
+    AI_FOUNDRY_DEPLOYMENT: str = "gpt-4o-mini"
     GAMMA_API_KEY: str = ""
     BLOB_STORAGE_ACCOUNT: str = ""
 
