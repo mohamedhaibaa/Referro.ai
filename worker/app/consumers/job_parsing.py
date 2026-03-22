@@ -6,11 +6,10 @@ from datetime import datetime, timezone
 
 import httpx
 from bs4 import BeautifulSoup
-from sqlalchemy import text
 from azure.servicebus.aio import ServiceBusClient
 
 from app.core.config import settings
-from app.db import SessionLocal
+from app.db import engine
 
 logger = logging.getLogger(__name__)
 
@@ -93,64 +92,61 @@ async def _parse_with_ai(raw_text: str) -> dict:
     return json.loads(content)
 
 
-def _update_workflow_run(db, run_id: str, status: str, output: dict = None, error: str = None):
+def _update_workflow_run(conn, run_id: str, status: str, output: dict = None, error: str = None):
     now = datetime.now(timezone.utc)
-    params: dict = {"status": status, "run_id": run_id, "now": now}
+    sets = ["status = %s"]
+    vals = [status]
 
-    set_clauses = ["status = %(status)s"]
     if status == "running":
-        set_clauses.append("started_at = %(now)s")
+        sets.append("started_at = %s")
+        vals.append(now)
     if status in ("completed", "failed"):
-        set_clauses.append("completed_at = %(now)s")
+        sets.append("completed_at = %s")
+        vals.append(now)
     if output is not None:
-        set_clauses.append("output_data = %(output)s")
-        params["output"] = json.dumps(output)
+        sets.append("output_data = %s")
+        vals.append(json.dumps(output))
     if error is not None:
-        set_clauses.append("error_message = %(error)s")
-        params["error"] = error
+        sets.append("error_message = %s")
+        vals.append(error)
 
-    db.execute(
-        text(f"UPDATE workflow_runs SET {', '.join(set_clauses)} WHERE id = %(run_id)s::uuid"),
-        params,
+    vals.append(run_id)
+    conn.execute(f"UPDATE workflow_runs SET {', '.join(sets)} WHERE id = %s::uuid", vals)
+
+
+def _update_job(conn, job_id: str, parsed: dict):
+    conn.execute(
+        """
+        UPDATE jobs SET
+            title       = CASE WHEN %s != '' THEN %s ELSE title END,
+            company     = CASE WHEN %s != '' THEN %s ELSE company END,
+            description = COALESCE(%s, description),
+            work_mode   = COALESCE(%s, work_mode),
+            role_family = COALESCE(%s, role_family),
+            fit_score   = COALESCE(%s, fit_score),
+            updated_at  = NOW()
+        WHERE id = %s::uuid
+        """,
+        [
+            parsed.get("title") or "", parsed.get("title") or "",
+            parsed.get("company") or "", parsed.get("company") or "",
+            parsed.get("description"),
+            parsed.get("work_mode"),
+            parsed.get("role_family"),
+            parsed.get("fit_score"),
+            job_id,
+        ],
     )
-    db.commit()
 
 
-def _update_job(db, job_id: str, parsed: dict):
-    db.execute(
-        text("""
-            UPDATE jobs SET
-                title       = CASE WHEN %(title)s != '' THEN %(title)s ELSE title END,
-                company     = CASE WHEN %(company)s != '' THEN %(company)s ELSE company END,
-                description = COALESCE(%(description)s, description),
-                work_mode   = COALESCE(%(work_mode)s, work_mode),
-                role_family = COALESCE(%(role_family)s, role_family),
-                fit_score   = COALESCE(%(fit_score)s, fit_score),
-                updated_at  = NOW()
-            WHERE id = %(job_id)s::uuid
-        """),
-        {
-            "job_id": job_id,
-            "title": parsed.get("title") or "",
-            "company": parsed.get("company") or "",
-            "description": parsed.get("description"),
-            "work_mode": parsed.get("work_mode"),
-            "role_family": parsed.get("role_family"),
-            "fit_score": parsed.get("fit_score"),
-        },
+def _insert_activity(conn, job_id: str, user_id: str, action: str):
+    conn.execute(
+        """
+        INSERT INTO activity_log (id, job_id, user_id, action, created_at)
+        VALUES (%s::uuid, %s::uuid, %s::uuid, %s, NOW())
+        """,
+        [str(uuid.uuid4()), job_id, user_id, action],
     )
-    db.commit()
-
-
-def _insert_activity(db, job_id: str, user_id: str, action: str):
-    db.execute(
-        text("""
-            INSERT INTO activity_log (id, job_id, user_id, action, created_at)
-            VALUES (%(id)s::uuid, %(job_id)s::uuid, %(user_id)s::uuid, %(action)s, NOW())
-        """),
-        {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "action": action},
-    )
-    db.commit()
 
 
 async def _process_message(payload: dict):
@@ -161,46 +157,52 @@ async def _process_message(payload: dict):
 
     logger.info(f"[job-parsing] Starting: job_id={job_id} url={url}")
 
-    db = SessionLocal()
-    try:
-        # 1. Mark as running
-        _update_workflow_run(db, workflow_run_id, "running")
-
-        # 2. Scrape the URL
+    with engine.connect() as conn:
+        raw_conn = conn.connection  # raw psycopg connection
+        cur = raw_conn.cursor()
         try:
-            raw_text = await _scrape_url(url)
+            # 1. Mark as running
+            _update_workflow_run(cur, workflow_run_id, "running")
+            raw_conn.commit()
+
+            # 2. Scrape the URL
+            try:
+                raw_text = await _scrape_url(url)
+            except Exception as e:
+                logger.error(f"[job-parsing] Scrape failed for {url}: {e}")
+                _update_workflow_run(cur, workflow_run_id, "failed", error=f"Failed to scrape URL: {e}")
+                raw_conn.commit()
+                return
+
+            # 3. Parse with AI
+            try:
+                parsed = await _parse_with_ai(raw_text)
+            except Exception as e:
+                logger.error(f"[job-parsing] AI parsing failed: {e}")
+                _update_workflow_run(cur, workflow_run_id, "failed", error=f"AI parsing failed: {e}")
+                raw_conn.commit()
+                return
+
+            # 4. Write parsed data back to the job row
+            _update_job(cur, job_id, parsed)
+
+            # 5. Activity log
+            _insert_activity(cur, job_id, user_id, "Job details parsed by AI")
+
+            # 6. Mark completed
+            _update_workflow_run(cur, workflow_run_id, "completed", output=parsed)
+            raw_conn.commit()
+
+            logger.info(f"[job-parsing] Completed: job_id={job_id} title={parsed.get('title')!r}")
+
         except Exception as e:
-            logger.error(f"[job-parsing] Scrape failed for {url}: {e}")
-            _update_workflow_run(db, workflow_run_id, "failed", error=f"Failed to scrape URL: {e}")
-            return
-
-        # 3. Parse with AI
-        try:
-            parsed = await _parse_with_ai(raw_text)
-        except Exception as e:
-            logger.error(f"[job-parsing] AI parsing failed: {e}")
-            _update_workflow_run(db, workflow_run_id, "failed", error=f"AI parsing failed: {e}")
-            return
-
-        # 4. Write parsed data back to the job row
-        _update_job(db, job_id, parsed)
-
-        # 5. Activity log
-        _insert_activity(db, job_id, user_id, "Job details parsed by AI")
-
-        # 6. Mark completed
-        _update_workflow_run(db, workflow_run_id, "completed", output=parsed)
-
-        logger.info(f"[job-parsing] Completed: job_id={job_id} title={parsed.get('title')!r}")
-
-    except Exception as e:
-        logger.exception(f"[job-parsing] Unexpected error: {e}")
-        try:
-            _update_workflow_run(db, workflow_run_id, "failed", error=str(e))
-        except Exception:
-            pass
-    finally:
-        db.close()
+            logger.exception(f"[job-parsing] Unexpected error: {e}")
+            try:
+                raw_conn.rollback()
+                _update_workflow_run(cur, workflow_run_id, "failed", error=str(e))
+                raw_conn.commit()
+            except Exception:
+                pass
 
 
 async def listen():
