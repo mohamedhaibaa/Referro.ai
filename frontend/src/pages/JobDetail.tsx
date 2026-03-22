@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, ExternalLink, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { JobStatus } from "@/types/job";
 import Sidebar from "@/components/Sidebar";
 import ProgressTracker from "@/components/job-detail/ProgressTracker";
@@ -115,30 +114,6 @@ const JobDetail = () => {
                   View Job Posting
                   <ExternalLink className="w-3 h-3" />
                 </a>
-              </div>
-
-              {/* Parsed metadata badges */}
-              <div className="flex items-center gap-2 mb-3 flex-wrap">
-                {job.workMode && (
-                  <Badge variant="outline" className="text-xs capitalize">{job.workMode}</Badge>
-                )}
-                {job.roleFamily && (
-                  <Badge variant="outline" className="text-xs capitalize">{job.roleFamily}</Badge>
-                )}
-                {job.fitScore && (
-                  <Badge
-                    variant="outline"
-                    className={`text-xs capitalize ${
-                      job.fitScore === "high"
-                        ? "border-green-500 text-green-600 bg-green-50"
-                        : job.fitScore === "medium"
-                        ? "border-yellow-500 text-yellow-600 bg-yellow-50"
-                        : "border-red-400 text-red-500 bg-red-50"
-                    }`}
-                  >
-                    {job.fitScore} fit
-                  </Badge>
-                )}
               </div>
 
               <div className="flex items-center gap-3">
