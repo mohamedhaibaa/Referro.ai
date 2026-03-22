@@ -6,7 +6,7 @@ from app.db.session import get_db
 from app.db.models.job import Job, JobMilestone
 from app.db.models.user import User
 from app.api.deps import get_current_user
-import uuid
+from app.services import queue
 
 router = APIRouter()
 
@@ -28,6 +28,19 @@ class PatchJobRequest(BaseModel):
     role_family: Optional[str] = None
 
 
+class PatchMilestonesRequest(BaseModel):
+    resume_tailored: Optional[bool] = None
+    contact_selected: Optional[bool] = None
+    outreach_sent: Optional[bool] = None
+    follow_up_sent: Optional[bool] = None
+    reply_received: Optional[bool] = None
+    interview_scheduled: Optional[bool] = None
+    interview_prep_1: Optional[bool] = None
+    interview_prep_2: Optional[bool] = None
+    interview_prep_3: Optional[bool] = None
+    outcome_recorded: Optional[bool] = None
+
+
 def _job_to_dict(job: Job) -> dict:
     return {
         "id": str(job.id),
@@ -44,6 +57,21 @@ def _job_to_dict(job: Job) -> dict:
         "progress": job.progress,
         "createdAt": job.created_at.isoformat(),
         "updatedAt": job.updated_at.isoformat(),
+    }
+
+
+def _milestone_to_dict(m: JobMilestone) -> dict:
+    return {
+        "resumeTailored": m.resume_tailored,
+        "contactSelected": m.contact_selected,
+        "outreachSent": m.outreach_sent,
+        "followUpSent": m.follow_up_sent,
+        "replyReceived": m.reply_received,
+        "interviewScheduled": m.interview_scheduled,
+        "interviewPrep1": m.interview_prep_1,
+        "interviewPrep2": m.interview_prep_2,
+        "interviewPrep3": m.interview_prep_3,
+        "outcomeRecorded": m.outcome_recorded,
     }
 
 
@@ -84,10 +112,16 @@ def create_job(
 
     milestone = JobMilestone(job_id=job.id, user_id=current_user.id)
     db.add(milestone)
-    db.commit()
-    db.refresh(job)
+    db.flush()
 
-    return {"data": _job_to_dict(job), "error": None}
+    # Publish to job-parsing queue (commits the transaction)
+    run = queue.publish_job_parsing(db, current_user.id, job.id, body.url)
+
+    db.refresh(job)
+    return {
+        "data": {**_job_to_dict(job), "workflowRunId": str(run.id)},
+        "error": None,
+    }
 
 
 @router.get("/{job_id}")
@@ -150,3 +184,40 @@ def delete_job(
     job.is_deleted = True
     db.commit()
     return
+
+
+@router.get("/{job_id}/milestones")
+def get_milestones(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    milestone = db.query(JobMilestone).filter(
+        JobMilestone.job_id == job_id,
+        JobMilestone.user_id == current_user.id,
+    ).first()
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestones not found")
+    return {"data": _milestone_to_dict(milestone), "error": None}
+
+
+@router.patch("/{job_id}/milestones")
+def update_milestones(
+    job_id: str,
+    body: PatchMilestonesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    milestone = db.query(JobMilestone).filter(
+        JobMilestone.job_id == job_id,
+        JobMilestone.user_id == current_user.id,
+    ).first()
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestones not found")
+
+    for field, value in body.model_dump(exclude_none=True).items():
+        setattr(milestone, field, value)
+
+    db.commit()
+    db.refresh(milestone)
+    return {"data": _milestone_to_dict(milestone), "error": None}

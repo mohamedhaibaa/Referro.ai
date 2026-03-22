@@ -18,7 +18,9 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import KanbanColumn from "./KanbanColumn";
 import KanbanFilters, { FilterState } from "./KanbanFilters";
 import { cn } from "@/lib/utils";
-import { useCreateJob } from "@/hooks/useJobs";
+import { useCreateJob, useUpdateJob } from "@/hooks/useJobs";
+import { useWorkflowRun } from "@/hooks/useWorkflowRun";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface KanbanBoardProps {
   jobs: Job[];
@@ -27,6 +29,10 @@ interface KanbanBoardProps {
 
 const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
   const createJob = useCreateJob();
+  const updateJob = useUpdateJob();
+  const qc = useQueryClient();
+  const [workflowRunId, setWorkflowRunId] = useState<string | null>(null);
+  const { data: workflowRun } = useWorkflowRun(workflowRunId);
   const [searchQuery, setSearchQuery] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<"board" | "list">("board");
@@ -113,11 +119,28 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
 
   const handleCreateJob = () => {
     if (jobUrl.trim()) {
-      createJob.mutate({ url: jobUrl.trim() });
+      createJob.mutate(
+        { url: jobUrl.trim() },
+        {
+          onSuccess: (job) => {
+            const runId = (job as any).workflowRunId ?? null;
+            if (runId) setWorkflowRunId(runId);
+          },
+        }
+      );
       setJobUrl("");
       setShowUrlInput(false);
     }
   };
+
+  // When workflow completes, refresh jobs list and clear polling
+  if (workflowRun?.status === "completed" || workflowRun?.status === "failed") {
+    if (workflowRunId) {
+      qc.invalidateQueries({ queryKey: ["jobs"] });
+      // Clear after a tick to avoid state-during-render
+      setTimeout(() => setWorkflowRunId(null), 0);
+    }
+  }
 
   const handleDragStart = (e: React.DragEvent, jobId: string) => {
     setDraggedJobId(jobId);
@@ -128,19 +151,18 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
     e.preventDefault();
     if (!draggedJobId) return;
 
-    const updatedJobs = jobs.map((job) =>
-      job.id === draggedJobId ? { ...job, status: newStatus } : job
-    );
-
-    onJobsChange?.(updatedJobs);
+    const job = jobs.find((j) => j.id === draggedJobId);
+    if (job && job.status !== newStatus) {
+      updateJob.mutate({ id: draggedJobId, patch: { status: newStatus } });
+    }
     setDraggedJobId(null);
   };
 
   const handleMoveJob = (jobId: string, newStatus: JobStatus) => {
-    const updatedJobs = jobs.map((job) =>
-      job.id === jobId ? { ...job, status: newStatus } : job
-    );
-    onJobsChange?.(updatedJobs);
+    const job = jobs.find((j) => j.id === jobId);
+    if (job && job.status !== newStatus) {
+      updateJob.mutate({ id: jobId, patch: { status: newStatus } });
+    }
   };
 
   const handleWipLimitChange = (
@@ -207,6 +229,22 @@ const KanbanBoard = ({ jobs, onJobsChange }: KanbanBoardProps) => {
         </div>
       </div>
 
+
+      {/* Parsing indicator */}
+      {workflowRunId && workflowRun && workflowRun.status !== "completed" && workflowRun.status !== "failed" && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-4 bg-primary/10 rounded-xl text-sm text-primary">
+          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          Parsing job details with AI...
+        </div>
+      )}
+      {workflowRunId && workflowRun?.status === "failed" && (
+        <div className="flex items-center gap-2 px-3 py-2 mb-4 bg-destructive/10 rounded-xl text-sm text-destructive">
+          AI parsing failed — job was saved but details may be incomplete.
+        </div>
+      )}
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         {/* Search */}

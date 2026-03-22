@@ -1,18 +1,10 @@
-.PHONY: up down backend worker frontend migrate
+.PHONY: backend worker frontend migrate install lint-fe
 
-# Start local Postgres
-up:
-	docker compose -f docker-compose.local.yml up -d
-
-# Stop local services
-down:
-	docker compose -f docker-compose.local.yml down
-
-# Run backend API (from backend/ with venv active)
+# Run backend API
 backend:
 	cd backend && uvicorn app.main:app --reload --port 8000
 
-# Run worker (from worker/ with venv active)
+# Run worker
 worker:
 	cd worker && python -m app.main
 
@@ -20,7 +12,7 @@ worker:
 frontend:
 	cd frontend && npm run dev
 
-# Run DB migrations
+# Run DB migrations against Azure Postgres
 migrate:
 	cd backend && alembic upgrade head
 
