@@ -140,6 +140,31 @@ const KanbanCard = ({ job, onMoveToColumn, onDragStart }: KanbanCardProps) => {
         </span>
       </div>
 
+      {/* Parsed metadata badges */}
+      {(job.workMode || job.fitScore) && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {job.workMode && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 capitalize">
+              {job.workMode}
+            </Badge>
+          )}
+          {job.fitScore && (
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-1.5 py-0 h-5 capitalize ${
+                job.fitScore === "high"
+                  ? "border-green-500 text-green-600 bg-green-50"
+                  : job.fitScore === "medium"
+                  ? "border-yellow-500 text-yellow-600 bg-yellow-50"
+                  : "border-red-400 text-red-500 bg-red-50"
+              }`}
+            >
+              {job.fitScore} fit
+            </Badge>
+          )}
+        </div>
+      )}
+
       {/* Custom Tags */}
       {job.tags && job.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">

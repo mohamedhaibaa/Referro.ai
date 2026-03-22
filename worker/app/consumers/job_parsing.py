@@ -97,20 +97,20 @@ def _update_workflow_run(db, run_id: str, status: str, output: dict = None, erro
     now = datetime.now(timezone.utc)
     params: dict = {"status": status, "run_id": run_id, "now": now}
 
-    set_clauses = ["status = :status"]
+    set_clauses = ["status = %(status)s"]
     if status == "running":
-        set_clauses.append("started_at = :now")
+        set_clauses.append("started_at = %(now)s")
     if status in ("completed", "failed"):
-        set_clauses.append("completed_at = :now")
+        set_clauses.append("completed_at = %(now)s")
     if output is not None:
-        set_clauses.append("output_data = :output::jsonb")
+        set_clauses.append("output_data = %(output)s")
         params["output"] = json.dumps(output)
     if error is not None:
-        set_clauses.append("error_message = :error")
+        set_clauses.append("error_message = %(error)s")
         params["error"] = error
 
     db.execute(
-        text(f"UPDATE workflow_runs SET {', '.join(set_clauses)} WHERE id = :run_id::uuid"),
+        text(f"UPDATE workflow_runs SET {', '.join(set_clauses)} WHERE id = %(run_id)s::uuid"),
         params,
     )
     db.commit()
@@ -120,14 +120,14 @@ def _update_job(db, job_id: str, parsed: dict):
     db.execute(
         text("""
             UPDATE jobs SET
-                title       = CASE WHEN :title != '' THEN :title ELSE title END,
-                company     = CASE WHEN :company != '' THEN :company ELSE company END,
-                description = COALESCE(:description, description),
-                work_mode   = COALESCE(:work_mode, work_mode),
-                role_family = COALESCE(:role_family, role_family),
-                fit_score   = COALESCE(:fit_score, fit_score),
+                title       = CASE WHEN %(title)s != '' THEN %(title)s ELSE title END,
+                company     = CASE WHEN %(company)s != '' THEN %(company)s ELSE company END,
+                description = COALESCE(%(description)s, description),
+                work_mode   = COALESCE(%(work_mode)s, work_mode),
+                role_family = COALESCE(%(role_family)s, role_family),
+                fit_score   = COALESCE(%(fit_score)s, fit_score),
                 updated_at  = NOW()
-            WHERE id = :job_id::uuid
+            WHERE id = %(job_id)s::uuid
         """),
         {
             "job_id": job_id,
@@ -146,7 +146,7 @@ def _insert_activity(db, job_id: str, user_id: str, action: str):
     db.execute(
         text("""
             INSERT INTO activity_log (id, job_id, user_id, action, created_at)
-            VALUES (:id::uuid, :job_id::uuid, :user_id::uuid, :action, NOW())
+            VALUES (%(id)s::uuid, %(job_id)s::uuid, %(user_id)s::uuid, %(action)s, NOW())
         """),
         {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "action": action},
     )
