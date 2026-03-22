@@ -1,7 +1,8 @@
 from logging.config import fileConfig
 import os
 
-from sqlalchemy import engine_from_config
+from dotenv import load_dotenv
+from sqlalchemy import create_engine
 from sqlalchemy import pool
 
 from alembic import context
@@ -11,10 +12,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Load .env file so DATABASE_URL is available
-from pathlib import Path
-from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Load .env so DATABASE_URL is available without exporting it manually
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(config.config_file_name), ".env"))
 
 # Read DATABASE_URL from environment (overrides alembic.ini)
 db_url = os.environ.get("DATABASE_URL")
@@ -61,9 +60,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    from sqlalchemy import create_engine
-    url = config.get_main_option("sqlalchemy.url")
-    connectable = create_engine(url, poolclass=pool.NullPool)
+    connectable = create_engine(
+        config.get_main_option("sqlalchemy.url"),
+        poolclass=pool.NullPool,
+    )
 
     with connectable.connect() as connection:
         context.configure(
