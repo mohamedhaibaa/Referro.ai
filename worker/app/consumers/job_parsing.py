@@ -12,6 +12,7 @@ from sqlalchemy.orm import sessionmaker
 from app.core.config import settings
 from app.integrations.ai_foundry import ai_foundry
 from app.prompts.job_parsing import JOB_PARSING_SYSTEM_PROMPT
+from app.prompts.company_research import COMPANY_RESEARCH_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,29 @@ async def _process(payload: dict):
             text("""
                 INSERT INTO activity_log (id, job_id, user_id, action, created_at)
                 VALUES (:id, :job_id, :user_id, 'Job parsed by AI', :t)
+            """),
+            {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "t": now()},
+        )
+
+        # Company research
+        company_result = await ai_foundry.run_flow(
+            system_prompt=COMPANY_RESEARCH_SYSTEM_PROMPT,
+            user_message=f"Company: {out.get('company')}\nJob Title: {out.get('title')}",
+        )
+        company_data = json.loads(company_result)
+
+        db.execute(
+            text("""
+                UPDATE jobs SET company_research = :research, updated_at = :t
+                WHERE id = :job_id
+            """),
+            {"research": json.dumps(company_data), "t": now(), "job_id": job_id},
+        )
+
+        db.execute(
+            text("""
+                INSERT INTO activity_log (id, job_id, user_id, action, created_at)
+                VALUES (:id, :job_id, :user_id, 'Company research completed by AI', :t)
             """),
             {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "t": now()},
         )
