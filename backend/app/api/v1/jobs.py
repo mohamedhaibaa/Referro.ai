@@ -114,7 +114,9 @@ def create_job(
     db.add(milestone)
     db.flush()
 
-    # Publish to job-parsing queue (commits the transaction)
+    db.commit()
+
+    # Publish to job-parsing queue
     run = queue.publish_job_parsing(db, current_user.id, job.id, body.url)
 
     db.refresh(job)
