@@ -22,7 +22,8 @@ def _publish(queue_name: str, payload: dict, db: Session, user_id: uuid.UUID, jo
         input_data=payload,
     )
     db.add(run)
-    db.flush()  # get run.id before publishing
+    db.flush()  # get run.id before committing
+    db.commit()  # commit workflow_run before publishing so worker can query it
 
     # Inject workflow_run_id into the message
     message_body = {**payload, "workflow_run_id": str(run.id)}
@@ -36,8 +37,8 @@ def _publish(queue_name: str, payload: dict, db: Session, user_id: uuid.UUID, jo
         logger.error(f"Failed to publish to {queue_name}: {e}")
         run.status = "failed"
         run.error_message = f"Failed to publish to queue: {e}"
+        db.commit()
 
-    db.commit()
     db.refresh(run)
     return run
 

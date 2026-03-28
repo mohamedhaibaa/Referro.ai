@@ -3,9 +3,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-import httpx
 from azure.servicebus.aio import ServiceBusClient
-from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -13,28 +11,22 @@ from app.core.config import settings
 from app.integrations.ai_foundry import ai_foundry
 from app.prompts.job_parsing import JOB_PARSING_SYSTEM_PROMPT
 from app.prompts.company_research import COMPANY_RESEARCH_SYSTEM_PROMPT
+from app.scraper import scrape
 
 logger = logging.getLogger(__name__)
 
 QUEUE_NAME = "job-parsing"
 
-_engine = create_engine(settings.DATABASE_URL)
+_engine = create_engine(
+    settings.DATABASE_URL,
+    isolation_level="AUTOCOMMIT",
+)
 _Session = sessionmaker(bind=_engine)
-
-
-async def _scrape(url: str) -> str:
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as c:
-        r = await c.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
-    return soup.get_text(separator=" ", strip=True)[:8000]
 
 
 async def _process(payload: dict):
     wf_id   = payload["workflow_run_id"]
-    job_id  = payload["job_id"]
+    job_id  = uuid.UUID(payload["job_id"])
     user_id = payload["user_id"]
     url     = payload["url"]
 
@@ -47,9 +39,8 @@ async def _process(payload: dict):
             text("UPDATE workflow_runs SET status='running', started_at=:t WHERE id=:id"),
             {"t": now(), "id": wf_id},
         )
-        db.commit()
 
-        page_text = await _scrape(url)
+        page_text = await scrape(url)
 
         result = await ai_foundry.run_flow(
             system_prompt=JOB_PARSING_SYSTEM_PROMPT,
@@ -57,35 +48,47 @@ async def _process(payload: dict):
         )
         out = json.loads(result)
 
-        db.execute(
-            text("""
-                UPDATE jobs SET
-                    title       = COALESCE(:title,       title),
-                    company     = COALESCE(:company,     company),
-                    description = COALESCE(:description, description),
-                    work_mode   = COALESCE(:work_mode,   work_mode),
-                    role_family = COALESCE(:role_family, role_family),
-                    updated_at  = :t
-                WHERE id = :job_id
-            """),
-            {
-                "title":       out.get("title"),
-                "company":     out.get("company"),
-                "description": out.get("description"),
-                "work_mode":   out.get("employment_type"),
-                "role_family": out.get("seniority_level"),
-                "t":           now(),
-                "job_id":      job_id,
-            },
-        )
+        if out.get("title") is not None:
+            db.execute(
+                text("""
+                    UPDATE jobs SET
+                        title       = :title,
+                        company     = :company,
+                        description = :description,
+                        work_mode   = :work_mode,
+                        role_family = :role_family,
+                        updated_at  = :t
+                    WHERE id = :job_id
+                """),
+                {
+                    "title":       out.get("title"),
+                    "company":     out.get("company"),
+                    "description": out.get("description"),
+                    "work_mode":   out.get("employment_type"),
+                    "role_family": out.get("seniority_level"),
+                    "t":           now(),
+                    "job_id":      job_id,
+                },
+            )
 
-        db.execute(
-            text("""
-                INSERT INTO activity_log (id, job_id, user_id, action, created_at)
-                VALUES (:id, :job_id, :user_id, 'Job parsed by AI', :t)
-            """),
-            {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "t": now()},
-        )
+        job_exists = db.execute(
+            text("SELECT 1 FROM jobs WHERE id = :job_id"),
+            {"job_id": job_id},
+        ).fetchone()
+
+        try:
+            if job_exists:
+                db.execute(
+                    text("""
+                        INSERT INTO activity_log (id, job_id, user_id, action, created_at)
+                        VALUES (:id, :job_id, :user_id, 'Job parsed by AI', :t)
+                    """),
+                    {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "t": now()},
+                )
+            else:
+                logger.warning("job_id %s not found in jobs table — skipping activity_log insert", job_id)
+        except Exception as log_exc:
+            logger.warning("Failed to insert activity_log for job_id %s: %s", job_id, log_exc)
 
         # Company research
         company_result = await ai_foundry.run_flow(
@@ -117,7 +120,6 @@ async def _process(payload: dict):
             """),
             {"t": now(), "out": json.dumps(out), "id": wf_id},
         )
-        db.commit()
 
     except Exception as exc:
         logger.error("job_parsing failed: %s", exc, exc_info=True)
@@ -129,7 +131,6 @@ async def _process(payload: dict):
             """),
             {"err": str(exc), "t": now(), "id": wf_id},
         )
-        db.commit()
     finally:
         db.close()
 
