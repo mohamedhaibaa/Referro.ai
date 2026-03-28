@@ -3,15 +3,14 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-import httpx
 from azure.servicebus.aio import ServiceBusClient
-from bs4 import BeautifulSoup
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.integrations.ai_foundry import ai_foundry
 from app.prompts.job_parsing import JOB_PARSING_SYSTEM_PROMPT
+from app.scraper import scrape
 
 logger = logging.getLogger(__name__)
 
@@ -22,16 +21,6 @@ _engine = create_engine(
     isolation_level="AUTOCOMMIT",
 )
 _Session = sessionmaker(bind=_engine)
-
-
-async def _scrape(url: str) -> str:
-    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as c:
-        r = await c.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
-    return soup.get_text(separator=" ", strip=True)[:8000]
 
 
 async def _process(payload: dict):
@@ -50,7 +39,7 @@ async def _process(payload: dict):
             {"t": now(), "id": wf_id},
         )
 
-        page_text = await _scrape(url)
+        page_text = await scrape(url)
 
         result = await ai_foundry.run_flow(
             system_prompt=JOB_PARSING_SYSTEM_PROMPT,
@@ -110,6 +99,7 @@ async def _process(payload: dict):
 
     except Exception as exc:
         logger.error("job_parsing failed: %s", exc, exc_info=True)
+        db.rollback()
         db.execute(
             text("""
                 UPDATE workflow_runs SET status='failed', error_message=:err, completed_at=:t

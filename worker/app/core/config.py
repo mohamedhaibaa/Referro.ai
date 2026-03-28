@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     AI_FOUNDRY_API_KEY: str = ""
     GAMMA_API_KEY: str = ""
     BLOB_STORAGE_ACCOUNT: str = ""
+    SCRAPINGDOG_API_KEY: str = ""
 
     WORKER_POLL_INTERVAL_SECONDS: int = 2
 
