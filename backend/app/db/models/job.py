@@ -20,6 +20,7 @@ class Job(Base):
     company_logo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str] = mapped_column(Text, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    company_research: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="Interested")
     fit_score: Mapped[str | None] = mapped_column(String(10), nullable=True)
     work_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
