@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     GAMMA_API_KEY: str = ""
     BLOB_STORAGE_ACCOUNT: str = ""
     SCRAPINGDOG_API_KEY: str = ""
+    APIFY_API_TOKEN: str = ""
 
     WORKER_POLL_INTERVAL_SECONDS: int = 2
 
