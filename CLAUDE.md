@@ -161,6 +161,19 @@ Queue names are **kebab-case** and **case-sensitive**. Must match exactly betwee
 - Don't edit old Alembic migrations — create new ones
 - Don't commit .env files — use .env.example as template
 - Don't skip the WorkflowRun lifecycle steps
+- Don't use `isolation_level="AUTOCOMMIT"` in workers — rollback() becomes a no-op
+- Don't assume third-party API output schemas — log raw keys and verify before writing extraction logic
+- Don't construct LinkedIn company URLs from company name slugs — extract from HTML or use harvestapi/linkedin-company with domain validation
+- Don't store display-layer fields (confidence, relationship labels) in the DB — compute them in the API serializer
+- Don't forget to renew Service Bus message locks in long-running workers (use `_renew_lock_periodically`)
+
+## Worker Patterns
+
+- Every new consumer must follow: `queued → running → completed/failed` lifecycle
+- Every consumer that calls external APIs must renew its Service Bus lock every 30s
+- Always log raw AI responses before `json.loads()` — strip markdown fences before parsing
+- Delete stale records before inserting new ones (e.g. contacts) to prevent duplicates on re-runs
+- Use `python3.12` explicitly when creating venvs — `python3` defaults to 3.9 on this machine
 
 ---
 
