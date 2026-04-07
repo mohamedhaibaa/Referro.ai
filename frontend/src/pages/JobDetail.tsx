@@ -154,7 +154,7 @@ const JobDetail = () => {
               milestones={milestones}
               onToggle={toggleMilestone}
             />
-            <ContactDiscovery contacts={job.contacts || []} />
+            <ContactDiscovery jobId={job.id} />
             <OutreachBuilder />
             <FollowUpScheduler />
             <OutcomeSection />

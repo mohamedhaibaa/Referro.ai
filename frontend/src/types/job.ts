@@ -52,12 +52,18 @@ export interface Job {
 
 export interface Contact {
   id: string;
-  name: string;
+  fullName: string;
   title: string;
+  company: string;
+  location: string;
+  linkedinUrl?: string;
+  university?: string;
+  tenureMonths?: number;
+  relevanceScore?: number;
   relationship: "Recruiter" | "Hiring Manager" | "Team Lead" | "Employee";
   confidence: "High" | "Medium" | "Low";
   source: string;
-  profileUrl?: string;
+  createdAt?: string;
 }
 
 export interface OutreachMessage {

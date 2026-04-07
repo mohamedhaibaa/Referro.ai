@@ -51,3 +51,13 @@ def publish_job_parsing(db: Session, user_id: uuid.UUID, job_id: uuid.UUID, url:
         user_id=user_id,
         job_id=job_id,
     )
+
+
+def publish_contact_discovery(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> WorkflowRun:
+    return _publish(
+        queue_name="contact-discovery",
+        payload={"user_id": str(user_id), "job_id": str(job_id)},
+        db=db,
+        user_id=user_id,
+        job_id=job_id,
+    )

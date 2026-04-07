@@ -6,6 +6,7 @@ export function useJobs() {
   return useQuery({
     queryKey: ["jobs"],
     queryFn: listJobs,
+    refetchInterval: 5000, // poll every 5s so job titles update after parsing completes
   });
 }
 
@@ -14,6 +15,7 @@ export function useJob(id: string) {
     queryKey: ["jobs", id],
     queryFn: () => getJob(id),
     enabled: !!id,
+    refetchInterval: 5000,
   });
 }
 

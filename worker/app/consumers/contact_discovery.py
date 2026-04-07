@@ -24,22 +24,20 @@ SCORING_SYSTEM_PROMPT = (
     "the best people to reach out to for a coffee chat. "
     "Score each contact from 0-100 based on how useful they "
     "would be for someone applying for this role. "
-    "Scoring criteria: "
+    "Scoring criteria (apply in order, scores are additive): "
+    "- Recruiter, HR, or Talent Acquisition role: +40 points (always high priority regardless of department) "
     "- Same function/department as the job: +30 points "
-    "- Recruiter or HR role: +25 points "
-    "- Manager or team lead (not C-suite): +20 points "
-    "- Tenure 0-18 months at company: +15 points "
-    "- Same university as candidate: +25 points "
-    "- Located in same city as job: +10 points "
-    "- Unrelated department: -20 points "
+    "- Manager, team lead, or director (not C-suite): +20 points "
+    "- Located in same city as job: +15 points "
+    "- Tenure 0-18 months at company: +10 points "
+    "- Same university as candidate: +20 points "
     "- Tenure over 10 years: -10 points "
+    "- C-suite (CEO, CTO, CFO, etc.): -15 points (too senior to reach out to) "
+    "Important: Recruiters and HR roles always score at least 40. "
     "Return ONLY a JSON array with fields: linkedin_url, score (no other text)"
 )
 
-_engine = create_engine(
-    settings.DATABASE_URL,
-    isolation_level="AUTOCOMMIT",
-)
+_engine = create_engine(settings.DATABASE_URL)
 _Session = sessionmaker(bind=_engine)
 
 
@@ -57,10 +55,16 @@ def _extract_city(location: str | None) -> str:
     return location.split(",")[0].strip()
 
 
-def _tenure_months(tenure: dict | None) -> int:
-    if not tenure:
-        return 0
-    return (tenure.get("numYears", 0) or 0) * 12 + (tenure.get("numMonths", 0) or 0)
+def _tenure_months(tenure: dict | None, experience: list | None = None) -> int:
+    if tenure:
+        return (tenure.get("numYears", 0) or 0) * 12 + (tenure.get("numMonths", 0) or 0)
+    # Fallback: parse duration string from experience[0] e.g. "17 yrs 2 mos"
+    if experience and isinstance(experience, list) and experience:
+        duration = experience[0].get("duration", "") or ""
+        yrs = re.search(r"(\d+)\s*yr", duration)
+        mos = re.search(r"(\d+)\s*mo", duration)
+        return (int(yrs.group(1)) if yrs else 0) * 12 + (int(mos.group(1)) if mos else 0)
+    return 0
 
 
 def _extract_university(profile: dict) -> str:
@@ -70,12 +74,50 @@ def _extract_university(profile: dict) -> str:
     return ""
 
 
+def _is_active(profile: dict) -> bool:
+    """Return True if this profile is actively employed at the target company.
+
+    The Apify harvestapi~linkedin-company-employees actor can return position
+    data in several shapes depending on scraper mode:
+      - currentPositions / currentPosition  (light summary, may be absent)
+      - experience[]  (full history; current role has no endDate)
+    """
+    for key in ("currentPositions", "currentPosition"):
+        val = profile.get(key)
+        if val:
+            return True
+    experience = profile.get("experience") or []
+    return any(not e.get("endDate") for e in experience)
+
+
 def _current_position(profile: dict) -> dict:
-    for pos in profile.get("currentPositions", []):
-        if pos.get("current"):
-            return pos
-    positions = profile.get("currentPositions", [])
-    return positions[0] if positions else {}
+    """Return a normalised current-position dict with 'title' and 'companyName'.
+
+    Prioritises experience[] because it contains the full title (as 'position').
+    currentPosition is a light summary with only companyName — no title field.
+    """
+    # experience[] has the richest data; prefer entries with no endDate
+    experience = profile.get("experience") or []
+    current = [e for e in experience if not e.get("endDate")]
+    entry = (current or experience)
+    if entry:
+        pos = entry[0]
+        title = pos.get("title") or pos.get("position", "")
+        company = pos.get("companyName", "")
+        if title or company:
+            return {"title": title, "companyName": company}
+    # Fall back to currentPosition/currentPositions (light summary, often lacks title)
+    for key in ("currentPositions", "currentPosition"):
+        cp = profile.get(key) or []
+        if isinstance(cp, dict):
+            cp = [cp]
+        if cp:
+            pos = cp[0]
+            return {
+                "title": pos.get("title") or pos.get("position", ""),
+                "companyName": pos.get("companyName", ""),
+            }
+    return {}
 
 
 async def _apify_run(client: httpx.AsyncClient, actor_id: str, run_input: dict) -> list:
@@ -128,7 +170,7 @@ async def _process(payload: dict):
         )
 
         job = db.execute(
-            text("SELECT title, company, location FROM jobs WHERE id = :job_id"),
+            text("SELECT title, company, location, company_linkedin_url FROM jobs WHERE id = :job_id"),
             {"job_id": job_id},
         ).fetchone()
         if not job:
@@ -137,6 +179,7 @@ async def _process(payload: dict):
         job_title = job[0] or ""
         job_company = job[1] or ""
         job_location = job[2] or ""
+        company_linkedin_url = job[3] or ""
 
         candidate_university = ""
         resume_row = db.execute(
@@ -156,11 +199,20 @@ async def _process(payload: dict):
             candidate_university = candidate_university.strip().strip('"')
 
         # --- Step 1: Apify LinkedIn Company Employees ---
-        slug = _company_to_slug(job_company)
+        # Use the exact company URL extracted from the job page HTML if available.
+        # Fall back to slug guessing only as a last resort.
+        if company_linkedin_url:
+            linkedin_company_url = company_linkedin_url
+            logger.info("Using extracted company URL: %s", linkedin_company_url)
+        else:
+            slug = _company_to_slug(job_company)
+            linkedin_company_url = f"https://www.linkedin.com/company/{slug}/"
+            logger.warning("No company_linkedin_url found — falling back to slug: %s", linkedin_company_url)
+
         city = _extract_city(job_location)
 
         run_input = {
-            "companies": [f"https://www.linkedin.com/company/{slug}/"],
+            "companies": [linkedin_company_url],
             "profileScraperMode": "Full ($8 per 1k)",
             "maxItems": 15,
         }
@@ -172,13 +224,17 @@ async def _process(payload: dict):
                 client, "harvestapi~linkedin-company-employees", run_input,
             )
 
-        active_profiles = []
-        for p in profiles:
-            current_positions = p.get("currentPositions", [])
-            has_current = any(pos.get("current") for pos in current_positions)
-            if has_current and current_positions:
-                active_profiles.append(p)
+        logger.info("Apify returned %d raw profiles for company %s", len(profiles), job_company)
+        if profiles:
+            sample_keys = list(profiles[0].keys())
+            logger.info("Sample profile top-level keys: %s", sample_keys)
 
+        active_profiles = [p for p in profiles if _is_active(p)]
+
+        logger.info(
+            "Active profiles after filter: %d / %d",
+            len(active_profiles), len(profiles),
+        )
         if not active_profiles:
             logger.warning("No active profiles found for company %s", job_company)
 
@@ -190,9 +246,11 @@ async def _process(payload: dict):
                 "linkedin_url": p.get("linkedinUrl", ""),
                 "title": pos.get("title", ""),
                 "location": (p.get("location", {}) or {}).get("linkedinText", ""),
-                "tenure_months": _tenure_months(p.get("tenureAtCompany")),
+                "tenure_months": _tenure_months(p.get("tenureAtCompany"), p.get("experience")),
                 "university": _extract_university(p),
             })
+
+        logger.info("Sending %d contacts to AI for scoring", len(contacts_for_scoring))
 
         user_message = json.dumps({
             "job_title": job_title,
@@ -206,14 +264,25 @@ async def _process(payload: dict):
             system_prompt=SCORING_SYSTEM_PROMPT,
             user_message=user_message,
         )
-        scores = json.loads(scoring_result)
+        logger.info("Raw AI scoring response: %r", scoring_result)
+        # Strip markdown code fences if the model wrapped its output
+        cleaned = scoring_result.strip()
+        if cleaned.startswith("```"):
+            cleaned = re.sub(r"^```[a-z]*\n?", "", cleaned)
+            cleaned = re.sub(r"\n?```$", "", cleaned)
+        scores = json.loads(cleaned)
         score_map = {s["linkedin_url"]: s["score"] for s in scores}
+        logger.info("AI scores received: %s", score_map)
 
         active_profiles.sort(
             key=lambda p: score_map.get(p.get("linkedinUrl", ""), 0),
             reverse=True,
         )
         top5 = active_profiles[:5]
+        logger.info(
+            "Top 5 contacts selected: %s",
+            [(p.get("linkedinUrl", ""), score_map.get(p.get("linkedinUrl", ""), 0)) for p in top5],
+        )
 
         # --- Step 3: Apify Profile Posts ---
         posts_map = {}
@@ -236,12 +305,41 @@ async def _process(payload: dict):
                     posts_map[li_url] = []
 
         # --- Step 4: Save to DB ---
-        for profile in top5:
+        # Clear any previously discovered contacts for this job before saving new ones
+        db.execute(
+            text("DELETE FROM contacts WHERE job_id = :job_id AND user_id = :user_id"),
+            {"job_id": job_id, "user_id": user_id},
+        )
+        logger.info("Saving %d contacts to DB for job_id=%s", len(top5), job_id)
+        for i, profile in enumerate(top5):
             li_url = profile.get("linkedinUrl", "")
             pos = _current_position(profile)
             first = profile.get("firstName", "") or ""
             last = profile.get("lastName", "") or ""
             full_name = f"{first} {last}".strip()
+
+            contact_params = {
+                "id": str(uuid.uuid4()),
+                "job_id": job_id,
+                "user_id": user_id,
+                "full_name": full_name,
+                "linkedin_url": li_url,
+                "title": pos.get("title", ""),
+                "company": pos.get("companyName", ""),
+                "location": (profile.get("location", {}) or {}).get("linkedinText", ""),
+                "university": _extract_university(profile),
+                "tenure_months": _tenure_months(profile.get("tenureAtCompany"), profile.get("experience")),
+                "relevance_score": score_map.get(li_url, 0),
+                "t": now(),
+            }
+            logger.info(
+                "Inserting contact %d/%d: full_name=%r linkedin_url=%r title=%r score=%s",
+                i + 1, len(top5),
+                contact_params["full_name"],
+                contact_params["linkedin_url"],
+                contact_params["title"],
+                contact_params["relevance_score"],
+            )
 
             profile_with_posts = {**profile, "recent_posts": posts_map.get(li_url, [])}
 
@@ -256,22 +354,12 @@ async def _process(payload: dict):
                          :company, :location, :university, :tenure_months,
                          :relevance_score, :profile_data, :t)
                 """),
-                {
-                    "id": str(uuid.uuid4()),
-                    "job_id": job_id,
-                    "user_id": user_id,
-                    "full_name": full_name,
-                    "linkedin_url": li_url,
-                    "title": pos.get("title", ""),
-                    "company": pos.get("companyName", ""),
-                    "location": (profile.get("location", {}) or {}).get("linkedinText", ""),
-                    "university": _extract_university(profile),
-                    "tenure_months": _tenure_months(profile.get("tenureAtCompany")),
-                    "relevance_score": score_map.get(li_url, 0),
-                    "profile_data": json.dumps(profile_with_posts),
-                    "t": now(),
-                },
+                {**contact_params, "profile_data": json.dumps(profile_with_posts)},
             )
+            logger.info("Contact %d/%d inserted successfully: %r", i + 1, len(top5), full_name)
+
+        db.commit()
+        logger.info("Committed %d contacts to DB", len(top5))
 
         # --- Step 5: Cleanup ---
         try:
@@ -296,9 +384,10 @@ async def _process(payload: dict):
                 "id": wf_id,
             },
         )
+        db.commit()
 
     except Exception as exc:
-        logger.error("contact_discovery failed: %s", exc, exc_info=True)
+        logger.error("contact_discovery FAILED — wf_id=%s job_id=%s: %s", wf_id, job_id, exc, exc_info=True)
         db.rollback()
         db.execute(
             text("""
@@ -307,8 +396,26 @@ async def _process(payload: dict):
             """),
             {"err": str(exc), "t": now(), "id": wf_id},
         )
+        db.commit()
     finally:
         db.close()
+
+
+async def _renew_lock_periodically(receiver, msg, interval: int = 30):
+    """Renew the Service Bus message lock every interval seconds.
+
+    Contact discovery can take several minutes (multiple Apify calls), so the
+    default 60s lock would expire without this.
+    """
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            await receiver.renew_message_lock(msg)
+            logger.debug("Renewed message lock for contact-discovery message")
+    except asyncio.CancelledError:
+        pass
+    except Exception as exc:
+        logger.warning("Failed to renew message lock: %s", exc)
 
 
 async def listen():
@@ -316,9 +423,15 @@ async def listen():
     async with ServiceBusClient.from_connection_string(settings.SERVICE_BUS_CONNECTION_STRING) as sb:
         async with sb.get_queue_receiver(queue_name=QUEUE_NAME) as receiver:
             async for msg in receiver:
+                renew_task = asyncio.create_task(_renew_lock_periodically(receiver, msg))
                 try:
                     await _process(json.loads(str(msg)))
                     await receiver.complete_message(msg)
                 except Exception as exc:
                     logger.error("Message processing error: %s", exc, exc_info=True)
-                    await receiver.abandon_message(msg)
+                    try:
+                        await receiver.abandon_message(msg)
+                    except Exception:
+                        pass  # lock may have already expired
+                finally:
+                    renew_task.cancel()

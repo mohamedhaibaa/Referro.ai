@@ -139,7 +139,7 @@ cd backend && alembic downgrade -1
 | Queue | Publisher | Consumer | Status |
 |-------|-----------|----------|--------|
 | `job-parsing` | `backend/services/queue.py` | `worker/consumers/job_parsing.py` | ✅ Working |
-| `contact-discovery` | Stub | Stub | ❌ TODO |
+| `contact-discovery` | `backend/services/queue.py` | `worker/consumers/contact_discovery.py` | ✅ Working |
 | `outreach-generation` | Stub | Stub | ❌ TODO |
 | `follow-up-generation` | Stub | Stub | ❌ TODO |
 | `flash-card-generation` | Stub | Stub | ❌ TODO |

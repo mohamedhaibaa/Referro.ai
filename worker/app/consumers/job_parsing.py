@@ -1,8 +1,10 @@
+import asyncio
 import json
 import logging
 import uuid
 from datetime import datetime, timezone
 
+import httpx
 from azure.servicebus.aio import ServiceBusClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -11,7 +13,7 @@ from app.core.config import settings
 from app.integrations.ai_foundry import ai_foundry
 from app.prompts.job_parsing import JOB_PARSING_SYSTEM_PROMPT
 from app.prompts.company_research import COMPANY_RESEARCH_SYSTEM_PROMPT
-from app.scraper import scrape
+from app.scraper import scrape, extract_domain, find_linkedin_url_from_homepage
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,61 @@ _engine = create_engine(
     isolation_level="AUTOCOMMIT",
 )
 _Session = sessionmaker(bind=_engine)
+
+
+async def _find_linkedin_url_via_apify(company_name: str, domain: str) -> str | None:
+    """Search harvestapi/linkedin-company by name, validate result against domain."""
+    headers = {"Authorization": f"Bearer {settings.APIFY_API_TOKEN}"}
+    apify_base = "https://api.apify.com/v2"
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            r = await client.post(
+                f"{apify_base}/acts/harvestapi~linkedin-company/runs",
+                headers=headers,
+                json={"companies": [company_name], "scrapeMode": "Short"},
+            )
+            r.raise_for_status()
+            run_id = r.json()["data"]["id"]
+
+            while True:
+                await asyncio.sleep(5)
+                r = await client.get(f"{apify_base}/actor-runs/{run_id}", headers=headers)
+                r.raise_for_status()
+                status = r.json()["data"]["status"]
+                if status == "SUCCEEDED":
+                    break
+                if status in ("FAILED", "ABORTED", "TIMED-OUT"):
+                    raise RuntimeError(f"Apify run failed: {status}")
+
+            dataset_id = r.json()["data"]["defaultDatasetId"]
+            r = await client.get(f"{apify_base}/datasets/{dataset_id}/items", headers=headers)
+            r.raise_for_status()
+            results = r.json()
+
+        # Validate: find the result whose website domain matches our job domain
+        for company in results:
+            website = company.get("website") or ""
+            website_domain = extract_domain(website)
+            if domain and website_domain and (
+                domain in website_domain or website_domain in domain
+            ):
+                linkedin_url = company.get("linkedinUrl") or company.get("url") or ""
+                if "linkedin.com/company/" in linkedin_url:
+                    logger.info(
+                        "harvestapi matched company '%s' via domain %s → %s",
+                        company.get("name"), domain, linkedin_url,
+                    )
+                    return linkedin_url.rstrip("/") + "/"
+
+        logger.warning(
+            "harvestapi returned %d results for '%s' but none matched domain '%s'",
+            len(results), company_name, domain,
+        )
+    except Exception as exc:
+        logger.warning("harvestapi company lookup failed for '%s': %s", company_name, exc)
+
+    return None
 
 
 async def _process(payload: dict):
@@ -40,7 +97,8 @@ async def _process(payload: dict):
             {"t": now(), "id": wf_id},
         )
 
-        page_text = await scrape(url)
+        page_text, company_linkedin_url = await scrape(url)
+        logger.info("scraper: company_linkedin_url extracted: %s", company_linkedin_url)
 
         result = await ai_foundry.run_flow(
             system_prompt=JOB_PARSING_SYSTEM_PROMPT,
@@ -52,24 +110,50 @@ async def _process(payload: dict):
             db.execute(
                 text("""
                     UPDATE jobs SET
-                        title       = :title,
-                        company     = :company,
-                        description = :description,
-                        work_mode   = :work_mode,
-                        role_family = :role_family,
-                        updated_at  = :t
+                        title                = :title,
+                        company              = :company,
+                        description          = :description,
+                        location             = :location,
+                        work_mode            = :work_mode,
+                        role_family          = :role_family,
+                        company_linkedin_url = :company_linkedin_url,
+                        updated_at           = :t
                     WHERE id = :job_id
                 """),
                 {
-                    "title":       out.get("title"),
-                    "company":     out.get("company"),
-                    "description": out.get("description"),
-                    "work_mode":   out.get("employment_type"),
-                    "role_family": out.get("seniority_level"),
-                    "t":           now(),
-                    "job_id":      job_id,
+                    "title":                out.get("title"),
+                    "company":              out.get("company"),
+                    "description":          out.get("description"),
+                    "location":             out.get("location", ""),
+                    "work_mode":            out.get("employment_type"),
+                    "role_family":          out.get("seniority_level"),
+                    "company_linkedin_url": company_linkedin_url,
+                    "t":                    now(),
+                    "job_id":               job_id,
                 },
             )
+
+        # --- Fallback: find company LinkedIn URL for non-LinkedIn job pages ---
+        if not company_linkedin_url and out.get("company"):
+            domain = extract_domain(url)
+            if domain:
+                logger.info("Non-LinkedIn URL — trying footer scrape for domain: %s", domain)
+                company_linkedin_url = await find_linkedin_url_from_homepage(domain)
+
+            if not company_linkedin_url:
+                logger.info("Footer scrape failed — trying harvestapi/linkedin-company for: %s", out.get("company"))
+                company_linkedin_url = await _find_linkedin_url_via_apify(
+                    out.get("company", ""), domain
+                )
+
+            if company_linkedin_url:
+                db.execute(
+                    text("UPDATE jobs SET company_linkedin_url = :url WHERE id = :job_id"),
+                    {"url": company_linkedin_url, "job_id": job_id},
+                )
+                logger.info("company_linkedin_url saved via fallback: %s", company_linkedin_url)
+            else:
+                logger.warning("Could not determine company LinkedIn URL for: %s", out.get("company"))
 
         job_exists = db.execute(
             text("SELECT 1 FROM jobs WHERE id = :job_id"),
@@ -120,6 +204,7 @@ async def _process(payload: dict):
             """),
             {"t": now(), "out": json.dumps(out), "id": wf_id},
         )
+        db.commit()
 
     except Exception as exc:
         logger.error("job_parsing failed: %s", exc, exc_info=True)
@@ -131,6 +216,7 @@ async def _process(payload: dict):
             """),
             {"err": str(exc), "t": now(), "id": wf_id},
         )
+        db.commit()
     finally:
         db.close()
 
