@@ -1,0 +1,225 @@
+from fastapi import APIRouter, status, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from sqlalchemy.orm import Session
+from app.db.session import get_db
+from app.db.models.job import Job, JobMilestone
+from app.db.models.user import User
+from app.api.deps import get_current_user
+from app.services import queue
+
+router = APIRouter()
+
+
+class CreateJobRequest(BaseModel):
+    url: str
+    title: str = ""
+    company: str = ""
+
+
+class PatchJobRequest(BaseModel):
+    status: Optional[str] = None
+    title: Optional[str] = None
+    company: Optional[str] = None
+    due_date: Optional[str] = None
+    progress: Optional[int] = None
+    fit_score: Optional[str] = None
+    work_mode: Optional[str] = None
+    role_family: Optional[str] = None
+
+
+class PatchMilestonesRequest(BaseModel):
+    resume_tailored: Optional[bool] = None
+    contact_selected: Optional[bool] = None
+    outreach_sent: Optional[bool] = None
+    follow_up_sent: Optional[bool] = None
+    reply_received: Optional[bool] = None
+    interview_scheduled: Optional[bool] = None
+    interview_prep_1: Optional[bool] = None
+    interview_prep_2: Optional[bool] = None
+    interview_prep_3: Optional[bool] = None
+    outcome_recorded: Optional[bool] = None
+
+
+def _job_to_dict(job: Job) -> dict:
+    return {
+        "id": str(job.id),
+        "title": job.title,
+        "company": job.company,
+        "companyLogoUrl": job.company_logo_url,
+        "url": job.url,
+        "description": job.description,
+        "status": job.status,
+        "fitScore": job.fit_score,
+        "workMode": job.work_mode,
+        "roleFamily": job.role_family,
+        "dueDate": job.due_date.isoformat() if job.due_date else None,
+        "progress": job.progress,
+        "createdAt": job.created_at.isoformat(),
+        "updatedAt": job.updated_at.isoformat(),
+    }
+
+
+def _milestone_to_dict(m: JobMilestone) -> dict:
+    return {
+        "resumeTailored": m.resume_tailored,
+        "contactSelected": m.contact_selected,
+        "outreachSent": m.outreach_sent,
+        "followUpSent": m.follow_up_sent,
+        "replyReceived": m.reply_received,
+        "interviewScheduled": m.interview_scheduled,
+        "interviewPrep1": m.interview_prep_1,
+        "interviewPrep2": m.interview_prep_2,
+        "interviewPrep3": m.interview_prep_3,
+        "outcomeRecorded": m.outcome_recorded,
+    }
+
+
+@router.get("")
+def list_jobs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    jobs = (
+        db.query(Job)
+        .filter(Job.user_id == current_user.id, Job.is_deleted == False)
+        .order_by(Job.created_at.desc())
+        .all()
+    )
+    return {
+        "data": [_job_to_dict(j) for j in jobs],
+        "meta": {"total": len(jobs)},
+        "error": None,
+    }
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_job(
+    body: CreateJobRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = Job(
+        user_id=current_user.id,
+        url=body.url,
+        title=body.title,
+        company=body.company,
+        status="Interested",
+        progress=0,
+    )
+    db.add(job)
+    db.flush()
+
+    milestone = JobMilestone(job_id=job.id, user_id=current_user.id)
+    db.add(milestone)
+    db.flush()
+
+    db.commit()
+
+    # Publish to job-parsing queue
+    run = queue.publish_job_parsing(db, current_user.id, job.id, body.url)
+
+    db.refresh(job)
+    return {
+        "data": {**_job_to_dict(job), "workflowRunId": str(run.id)},
+        "error": None,
+    }
+
+
+@router.get("/{job_id}")
+def get_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(
+        Job.id == job_id,
+        Job.user_id == current_user.id,
+        Job.is_deleted == False,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"data": _job_to_dict(job), "error": None}
+
+
+@router.patch("/{job_id}")
+def update_job(
+    job_id: str,
+    body: PatchJobRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(
+        Job.id == job_id,
+        Job.user_id == current_user.id,
+        Job.is_deleted == False,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    for field, value in body.model_dump(exclude_none=True).items():
+        if field == "due_date" and value:
+            from datetime import date
+            job.due_date = date.fromisoformat(value)
+        else:
+            setattr(job, field, value)
+
+    db.commit()
+    db.refresh(job)
+    return {"data": _job_to_dict(job), "error": None}
+
+
+@router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(
+        Job.id == job_id,
+        Job.user_id == current_user.id,
+        Job.is_deleted == False,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job.is_deleted = True
+    db.commit()
+    return
+
+
+@router.get("/{job_id}/milestones")
+def get_milestones(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    milestone = db.query(JobMilestone).filter(
+        JobMilestone.job_id == job_id,
+        JobMilestone.user_id == current_user.id,
+    ).first()
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestones not found")
+    return {"data": _milestone_to_dict(milestone), "error": None}
+
+
+@router.patch("/{job_id}/milestones")
+def update_milestones(
+    job_id: str,
+    body: PatchMilestonesRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    milestone = db.query(JobMilestone).filter(
+        JobMilestone.job_id == job_id,
+        JobMilestone.user_id == current_user.id,
+    ).first()
+    if not milestone:
+        raise HTTPException(status_code=404, detail="Milestones not found")
+
+    for field, value in body.model_dump(exclude_none=True).items():
+        setattr(milestone, field, value)
+
+    db.commit()
+    db.refresh(milestone)
+    return {"data": _milestone_to_dict(milestone), "error": None}
