@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Referro Waitlist <onboarding@resend.dev>',
+        from: 'Referro Waitlist <waitlist@getreferro.ai>',
         to: 'Referro.ai@gmail.com',
         subject: `New Waitlist Signup: ${cleanEmail}`,
         text: `New waitlist signup!\n\nEmail: ${cleanEmail}\nTime: ${new Date().toISOString()}\nSource: Landing page`,
