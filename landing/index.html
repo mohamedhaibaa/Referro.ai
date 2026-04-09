@@ -117,6 +117,9 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .hero-form button { padding: 16px 28px; background: var(--coral); color: var(--white); border: none; border-radius: 100px; font-family: var(--font); font-size: .92rem; font-weight: 500; white-space: nowrap; transition: all .3s var(--ease); cursor: none; }
 .hero-form button:hover { background: #d4623b; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,115,74,0.3); }
 .hero-note { margin-top: 14px; font-size: .78rem; color: var(--ink-30); font-weight: 300; }
+.hero-note.success { color: var(--coral); font-weight: 500; }
+.hero-form button.celebrating { background: var(--gold); transform: scale(1.05); box-shadow: 0 8px 32px rgba(232,168,56,0.4); }
+.confetti-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 10; }
 
 /* Float cards — draggable + floating */
 .hero-visual { position: relative; height: 520px; }
@@ -679,6 +682,45 @@ document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click'
   jObs.observe(document.getElementById('journeyBox'));
 })();
 
+// Confetti burst
+function burstConfetti(origin) {
+  const rect = origin.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const colors = ['#E8734A','#E8A838','#B8A0D2','#6BBF8A','#F2A88A','#F5D48B'];
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:hidden';
+  document.body.appendChild(container);
+  for (let i = 0; i < 60; i++) {
+    const dot = document.createElement('div');
+    const size = Math.random() * 8 + 4;
+    const angle = Math.random() * Math.PI * 2;
+    const velocity = Math.random() * 200 + 120;
+    const dx = Math.cos(angle) * velocity;
+    const dy = Math.sin(angle) * velocity - 80;
+    const rotation = Math.random() * 720 - 360;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const isCircle = Math.random() > 0.5;
+    dot.style.cssText = `position:absolute;left:${cx}px;top:${cy}px;width:${size}px;height:${isCircle ? size : size * 0.5}px;background:${color};border-radius:${isCircle ? '50%' : '2px'};opacity:1;transition:none;`;
+    container.appendChild(dot);
+    const start = performance.now();
+    (function animate(dot, dx, dy, rotation) {
+      requestAnimationFrame(function tick(now) {
+        const t = (now - start) / 1000;
+        if (t > 1.2) { dot.remove(); return; }
+        const x = cx + dx * t;
+        const y = cy + dy * t + 300 * t * t;
+        const r = rotation * t;
+        const o = Math.max(0, 1 - t / 1.2);
+        dot.style.transform = `translate(-50%,-50%) translate(${x - cx}px,${y - cy}px) rotate(${r}deg)`;
+        dot.style.opacity = o;
+        requestAnimationFrame(tick);
+      });
+    })(dot, dx, dy, rotation);
+  }
+  setTimeout(() => container.remove(), 1500);
+}
+
 // Waitlist form
 (function(){
   const emailInput = document.getElementById('waitlistEmail');
@@ -709,6 +751,8 @@ document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click'
         msg.classList.add('success');
         emailInput.value = '';
         btn.textContent = 'You\'re in!';
+        btn.classList.add('celebrating');
+        burstConfetti(btn);
       } else if (res.status === 429) {
         msg.textContent = 'Too many attempts. Please try again in a minute.';
         msg.classList.add('error');
