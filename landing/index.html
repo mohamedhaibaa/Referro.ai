@@ -107,14 +107,14 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .hero::before { content:''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
 .hero > * { position: relative; z-index: 1; }
 .hero-grid { margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; width: 100%; }
-.hero-text h1 { font-size: clamp(3rem, 5.5vw, 4.8rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 24px; }
+.hero-text h1 { font-size: clamp(3.5rem, 5.5vw, 5rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 24px; }
 .hero-text h1 em { font-style: italic; color: var(--coral); }
-.hero-text .lead { font-size: 1.05rem; line-height: 1.65; color: var(--ink-60); max-width: 520px; margin-bottom: 36px; font-weight: 300; }
-.hero-form { display: flex; gap: 10px; max-width: 500px; }
-.hero-form input { flex: 1; padding: 16px 22px; border: 1.5px solid var(--ink-10); border-radius: 100px; background: var(--white); font-family: var(--font); font-size: .92rem; font-weight: 300; color: var(--ink); outline: none; transition: all .3s; cursor: none; }
+.hero-text .lead { font-size: 1.12rem; line-height: 1.65; color: var(--ink-60); max-width: 520px; margin-bottom: 36px; font-weight: 300; }
+.hero-form { display: flex; gap: 10px; max-width: 540px; }
+.hero-form input { flex: 1; padding: 18px 24px; border: 1.5px solid var(--ink-10); border-radius: 100px; background: var(--white); font-family: var(--font); font-size: 1rem; font-weight: 300; color: var(--ink); outline: none; transition: all .3s; cursor: none; }
 .hero-form input::placeholder { color: var(--ink-30); }
 .hero-form input:focus { border-color: var(--coral); box-shadow: 0 0 0 4px var(--coral-glow); }
-.hero-form button { padding: 16px 28px; background: var(--coral); color: var(--white); border: none; border-radius: 100px; font-family: var(--font); font-size: .92rem; font-weight: 500; white-space: nowrap; transition: all .3s var(--ease); cursor: none; }
+.hero-form button { padding: 18px 32px; background: var(--coral); color: var(--white); border: none; border-radius: 100px; font-family: var(--font); font-size: 1rem; font-weight: 500; white-space: nowrap; transition: all .3s var(--ease); cursor: none; }
 .hero-form button:hover { background: #d4623b; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,115,74,0.3); }
 .hero-note { margin-top: 14px; font-size: .78rem; color: var(--ink-30); font-weight: 300; }
 .hero-note.success { color: var(--coral); font-weight: 500; }
@@ -124,20 +124,20 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .confetti-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 10; }
 
 /* Float cards — draggable + floating */
-.hero-visual { position: relative; height: 520px; }
-.float-card { position: absolute; border-radius: 20px; padding: 24px; box-shadow: 0 8px 40px rgba(0,0,0,0.06); cursor: grab; user-select: none; -webkit-user-select: none; animation: floatY 6s ease-in-out infinite; transition: box-shadow .3s var(--ease); }
+.hero-visual { position: relative; height: 580px; }
+.float-card { position: absolute; border-radius: 1.25rem; padding: 1.75rem; box-shadow: 0 8px 40px rgba(0,0,0,0.06); cursor: grab; user-select: none; -webkit-user-select: none; animation: floatY 6s ease-in-out infinite; transition: box-shadow .3s var(--ease); }
 .float-card.dragging { cursor: grabbing; box-shadow: 0 20px 60px rgba(0,0,0,0.15); z-index: 100 !important; animation: none; }
 .float-card.snapping { animation: none; transition: transform .6s var(--ease), box-shadow .3s var(--ease); }
 .float-card:hover:not(.dragging) { box-shadow: 0 12px 48px rgba(0,0,0,0.1); }
 @keyframes floatY { 0%,100%{translate:0 0} 50%{translate:0 -14px} }
-.fc-1 { top: 0; left: 8%; background: var(--gold); color: var(--white); width: 230px; transform: rotate(-3deg); z-index: 1; }
-.fc-2 { top: 38%; right: 0; background: var(--white); border: 1.5px solid var(--ink-10); width: 250px; transform: rotate(2deg); z-index: 2; animation-delay: -2s; }
-.fc-3 { bottom: 0; left: 3%; background: var(--lavender); color: var(--white); width: 215px; transform: rotate(1.5deg); z-index: 3; animation-delay: -4s; }
-.fc-4 { top: 18%; left: 36%; background: var(--coral); color: var(--white); width: 200px; transform: rotate(-1.5deg); z-index: 4; animation-delay: -1s; }
-.fc-5 { top: 58%; left: 42%; background: var(--mint); color: var(--white); width: 210px; transform: rotate(2.5deg); z-index: 5; animation-delay: -3s; }
-.fc-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .7; margin-bottom: 8px; }
-.fc-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
-.fc-sub { font-size: .78rem; opacity: .7; margin-top: 6px; line-height: 1.4; }
+.fc-1 { top: 0; left: 8%; background: var(--gold); color: var(--white); width: 16.25rem; transform: rotate(-3deg); z-index: 1; }
+.fc-2 { top: 38%; right: 0; background: var(--white); border: 1.5px solid var(--ink-10); width: 17.5rem; transform: rotate(2deg); z-index: 2; animation-delay: -2s; }
+.fc-3 { bottom: 0; left: 3%; background: var(--lavender); color: var(--white); width: 15rem; transform: rotate(1.5deg); z-index: 3; animation-delay: -4s; }
+.fc-4 { top: 18%; left: 36%; background: var(--coral); color: var(--white); width: 13.75rem; transform: rotate(-1.5deg); z-index: 4; animation-delay: -1s; }
+.fc-5 { top: 58%; left: 42%; background: var(--mint); color: var(--white); width: 14.375rem; transform: rotate(2.5deg); z-index: 5; animation-delay: -3s; }
+.fc-label { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .7; margin-bottom: .5rem; }
+.fc-value { font-size: 2rem; font-weight: 700; line-height: 1.2; }
+.fc-sub { font-size: .92rem; opacity: .7; margin-top: .5rem; line-height: 1.45; }
 .hero-visual::-webkit-scrollbar { display: none; }
 .hero-visual { scrollbar-width: none; }
 
@@ -147,11 +147,11 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .pain .section-tag { display: inline-block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--coral); margin-bottom: 20px; }
 .pain-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
 .pain-text { }
-.pain-text h2 { font-family: var(--font); font-weight: 700; font-size: clamp(2.8rem, 5vw, 4.5rem); line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 24px; color: var(--ink); }
+.pain-text h2 { font-family: var(--font); font-weight: 700; font-size: clamp(3rem, 5.5vw, 4.8rem); line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 24px; color: var(--ink); }
 .pain-text h2 em { font-style: italic; color: var(--coral); }
-.pain-text p { font-size: 1.1rem; color: var(--ink-60); font-weight: 300; line-height: 1.7; margin-bottom: 14px; }
+.pain-text p { font-size: 1.15rem; color: var(--ink-60); font-weight: 300; line-height: 1.7; margin-bottom: 14px; }
 .pain-counter { margin-top: 40px; display: flex; align-items: baseline; gap: 14px; }
-.pain-counter-num { font-size: clamp(4rem, 8vw, 6rem); font-weight: 900; color: var(--coral); font-variant-numeric: tabular-nums; line-height: 1; }
+.pain-counter-num { font-size: clamp(4.5rem, 9vw, 6.5rem); font-weight: 900; color: var(--coral); font-variant-numeric: tabular-nums; line-height: 1; }
 .pain-counter-label { font-size: 1rem; color: var(--ink-30); font-weight: 300; }
 
 .rejection-inbox { position: relative; width: 100%; max-width: 580px; }
@@ -182,7 +182,7 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .how { padding: var(--section-pad) 0; background: var(--bg-cream); }
 .how .container { margin: 0 auto; padding: 0 5vw; }
 .how-header { text-align: center; margin-bottom: 48px; }
-.how-header h2 { font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--dark); }
+.how-header h2 { font-size: clamp(2rem, 3.5vw, 3rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--dark); }
 .how-header h2 .underline-wrap { position: relative; display: inline-block; }
 .underline-svg { position: absolute; bottom: -6px; left: -6px; right: -6px; width: calc(100% + 12px); height: 14px; overflow: visible; }
 .underline-svg path { fill: none; stroke: var(--coral); stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 300; stroke-dashoffset: 300; opacity: 0.7; }
@@ -199,9 +199,9 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .step-desc { display: none; }
 .step-desc.active { display: block; animation: stepFadeIn .5s var(--ease); }
 @keyframes stepFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-.step-desc .sd-num { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; color: var(--coral); }
-.step-desc h3 { font-size: clamp(1.6rem, 2.5vw, 2.2rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 14px; font-style: italic; color: var(--dark); }
-.step-desc p { font-size: 0.95rem; color: var(--ink-60); line-height: 1.65; font-weight: 300; max-width: 480px; }
+.step-desc .sd-num { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 18px; color: var(--coral); }
+.step-desc h3 { font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 16px; font-style: italic; color: var(--dark); }
+.step-desc p { font-size: 1.08rem; color: var(--ink-60); line-height: 1.7; font-weight: 300; max-width: 520px; }
 .jp-step { cursor: pointer; transition: color .3s, transform .2s; }
 .jp-step:hover { color: var(--coral); transform: scale(1.05); }
 .journey-progress { padding: 16px 24px 12px; border-bottom: 1px solid var(--ink-10); }
@@ -337,7 +337,7 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
     position: relative !important;
     top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
     transform: none !important;
-    min-width: 200px;
+    min-width: 220px;
     flex-shrink: 0;
     animation: none !important;
     scroll-snap-align: start;
@@ -423,9 +423,9 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
   .scroll-label { font-size: .6rem; }
   .scroll-arrow { width: 14px; height: 14px; }
   
-  .cursor-blob, .cursor-blob-text { display: none; }
-  body { cursor: auto; }
-  a, button, input { cursor: pointer; }
+  .cursor-dot, .cursor-ring, .cursor-blob, .cursor-blob-text { display: none; }
+  body, a, button, input, .nav-links a, .nav-cta, .hero-form input, .hero-form button, .float-card { cursor: auto !important; }
+  a, button { cursor: pointer !important; }
 }
 
 /* Small phone */
@@ -646,6 +646,14 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 
 <!-- ==================== SCRIPTS ==================== -->
 <script>
+// Scale up on non-Retina screens so it looks the same as on 2x displays
+(function(){
+  const dpr = window.devicePixelRatio || 1;
+  if (dpr < 1.5 && window.innerWidth > 900) {
+    const scale = 1.25;
+    document.documentElement.style.fontSize = (scale * 100) + '%';
+  }
+})();
 // Cursor
 const dot=document.querySelector('.cursor-dot'),ring=document.querySelector('.cursor-ring');
 let mx=0,my=0,rx=0,ry=0;
