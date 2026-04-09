@@ -359,11 +359,11 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
     <div class="hero-text">
       <h1 class="reveal">Land jobs through <em>people</em>, not portals</h1>
       <p class="lead reveal stagger-1">Stop sending resumes into the void. Referro.ai finds the right humans at your target companies and helps you write messages they'll actually read.</p>
-      <div class="hero-form reveal stagger-2">
-        <input type="email" placeholder="you@email.com" aria-label="Email">
-        <button type="button">Join the Waitlist →</button>
+      <div class="hero-form reveal stagger-2" id="waitlistForm">
+        <input type="email" placeholder="you@email.com" aria-label="Email" id="waitlistEmail">
+        <button type="button" id="waitlistBtn">Join the Waitlist →</button>
       </div>
-      <p class="hero-note reveal stagger-3">Free early access. No spam, ever.</p>
+      <p class="hero-note reveal stagger-3" id="waitlistMsg">Free early access. No spam, ever.</p>
     </div>
     <div class="hero-visual reveal stagger-2">
       <div class="float-card fc-1"><div class="fc-label">No More</div><div class="fc-value">Black Holes</div><div class="fc-sub">Stop sending resumes into the void. Get seen by real people.</div></div>
@@ -677,6 +677,56 @@ document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click'
 
   const jObs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting&&!journeyStarted){journeyStarted=true;setTimeout(runJourney,500)}})},{threshold:.3});
   jObs.observe(document.getElementById('journeyBox'));
+})();
+
+// Waitlist form
+(function(){
+  const emailInput = document.getElementById('waitlistEmail');
+  const btn = document.getElementById('waitlistBtn');
+  const msg = document.getElementById('waitlistMsg');
+  if (!emailInput || !btn || !msg) return;
+
+  async function handleSubmit() {
+    const email = emailInput.value.trim();
+    if (!email) {
+      emailInput.focus();
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Joining…';
+    msg.className = 'hero-note reveal stagger-3 visible';
+    msg.textContent = '';
+
+    try {
+      const res = await fetch('/api/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        msg.textContent = data.message || "You're on the list!";
+        msg.classList.add('success');
+        emailInput.value = '';
+        btn.textContent = 'You\'re in!';
+      } else if (res.status === 429) {
+        msg.textContent = 'Too many attempts. Please try again in a minute.';
+        msg.classList.add('error');
+        btn.textContent = 'Join the Waitlist →';
+        btn.disabled = false;
+      } else {
+        throw new Error(data.message || 'Something went wrong');
+      }
+    } catch (err) {
+      msg.textContent = err.message || 'Something went wrong. Please try again.';
+      msg.classList.add('error');
+      btn.textContent = 'Join the Waitlist →';
+      btn.disabled = false;
+    }
+  }
+
+  btn.addEventListener('click', handleSubmit);
+  emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
 })();
 </script>
 
