@@ -455,7 +455,7 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
     <a href="#pain">Problem</a>
     <a href="#how">How It Works</a>
   </div>
-  <a href="#footer" class="nav-cta">Join Waitlist</a>
+  <a href="#hero" class="nav-cta" id="navCta" style="opacity:0;pointer-events:none;transition:opacity .3s">Join Waitlist</a>
 </nav>
 
 <!-- ==================== HERO ==================== -->
@@ -636,9 +636,7 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
       <div class="footer-links">
         <a href="#hero">Home</a>
         <a href="#how">How It Works</a>
-        <a href="#">Features</a>
-        <a href="#">FAQ</a>
-        <a href="#">Blog</a>
+        <a href="#hero">Join the Waitlist</a>
       </div>
     </div>
   </div>
@@ -665,6 +663,11 @@ document.addEventListener('mouseenter',()=>{dot.style.opacity='1';ring.style.opa
 // Reveal
 const revObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:.12,rootMargin:'0px 0px -60px 0px'});
 document.querySelectorAll('.reveal').forEach(el=>revObs.observe(el));
+
+// Show nav CTA only after scrolling past hero
+const navCta=document.getElementById('navCta');
+const heroSection=document.getElementById('hero');
+if(navCta&&heroSection){const hObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){navCta.style.opacity='0';navCta.style.pointerEvents='none'}else{navCta.style.opacity='1';navCta.style.pointerEvents='auto'}})},{threshold:0.1});hObs.observe(heroSection)}
 
 // Zigzag draw
 const zigzagObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('drawn')})},{threshold:.5});
