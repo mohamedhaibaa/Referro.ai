@@ -118,6 +118,8 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .hero-form button:hover { background: #d4623b; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,115,74,0.3); }
 .hero-note { margin-top: 14px; font-size: .78rem; color: var(--ink-30); font-weight: 300; }
 .hero-note.success { color: var(--coral); font-weight: 500; }
+.hero-note.error { color: #d44; font-weight: 500; }
+.hero-form button:disabled { opacity: .7; cursor: not-allowed; }
 .hero-form button.celebrating { background: var(--gold); transform: scale(1.05); box-shadow: 0 8px 32px rgba(232,168,56,0.4); }
 .confetti-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 10; }
 
@@ -136,6 +138,8 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .fc-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .7; margin-bottom: 8px; }
 .fc-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
 .fc-sub { font-size: .78rem; opacity: .7; margin-top: 6px; line-height: 1.4; }
+.hero-visual::-webkit-scrollbar { display: none; }
+.hero-visual { scrollbar-width: none; }
 
 /* ========== PAIN SECTION — REJECTION INBOX ========== */
 .pain { padding: clamp(80px, 10vw, 140px) 0; position: relative; overflow: hidden; }
@@ -312,30 +316,128 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .footer-links a:hover { color: var(--white); }
 
 /* ========== RESPONSIVE ========== */
+
+/* Tablet */
 @media(max-width:900px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 48px; }
-  .hero-visual { height: 380px; }
-  .hero { padding: 120px 5vw 60px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 32px; }
+  .hero { padding: 100px 5vw 60px; }
+  
+  /* Cards become horizontal scroll instead of absolute positioned pile */
+  .hero-visual {
+    height: auto !important;
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 10px 0 20px;
+    scroll-snap-type: x mandatory;
+  }
+  .float-card {
+    position: relative !important;
+    top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+    transform: none !important;
+    min-width: 200px;
+    flex-shrink: 0;
+    animation: none !important;
+    scroll-snap-align: start;
+  }
+  .float-card.dragging { transform: none !important; }
+  .float-card.snapping { transform: none !important; }
 }
+
+/* Large phone */
 @media (max-width: 768px) {
-  .pain-layout { grid-template-columns: 1fr; gap: 48px; }
+  .pain-layout { grid-template-columns: 1fr; gap: 36px; }
   .rejection-inbox { max-width: 100%; }
-  .how-layout { grid-template-columns: 1fr; gap: 32px; }
+  .pain-text h2 { font-size: clamp(2rem, 7vw, 2.8rem); }
+  .pain-counter-num { font-size: clamp(3rem, 12vw, 4.5rem); }
+  .pain-text p { font-size: 1rem; }
+  
+  .how-layout { grid-template-columns: 1fr; gap: 24px; }
+  .how-header h2 { font-size: clamp(1.6rem, 6vw, 2.4rem); }
+  .journey-container { max-width: 100%; }
+  .jp-steps { font-size: 8px; gap: 2px; }
+  .journey-stage { min-height: 280px; }
+  .j-browser, .j-dashboard, .j-contacts-panel, .j-msg-panel, .j-status-panel, .j-final-panel { font-size: 13px; }
+  
   .footer-bottom { flex-direction: column; gap: 16px; align-items: flex-start; }
-  .footer-links { gap: 16px; }
-  .jp-steps { font-size: 8px; }
-  .journey-stage { min-height: 300px; }
+  .footer-links { gap: 14px; flex-wrap: wrap; }
+  .footer-giant-logo { font-size: clamp(3rem, 12vw, 8rem); }
 }
+
+/* Phone */
 @media(max-width:600px) {
-  .hero-form { flex-direction: column; }
-  .hero-form button { width: 100%; text-align: center; }
-  .hero-visual { display: none; }
+  .hero { padding: 90px 5vw 40px; min-height: auto; }
+  .hero-text h1 { font-size: clamp(2.2rem, 9vw, 3rem); margin-bottom: 16px; }
+  .hero-text .lead { font-size: .95rem; margin-bottom: 24px; }
+  
+  .hero-form { flex-direction: column; max-width: 100% !important; }
+  .hero-form input { padding: 16px 20px; font-size: 16px; }
+  .hero-form button { width: 100%; text-align: center; padding: 16px; font-size: 16px; }
+  
+  .hero-visual {
+    display: none;
+  }
+  
   .nav-links { display: none; }
-  .site-nav { padding: 8px 8px 8px 16px; }
-  .cursor-dot, .cursor-ring { display: none; }
+  .site-nav { 
+    padding: 8px 16px;
+    top: 0; left: 0; right: 0;
+    transform: none;
+    border-radius: 0;
+    justify-content: space-between;
+  }
+  .nav-cta { font-size: .78rem; padding: 7px 16px !important; }
+  
+  .pain { padding: clamp(50px, 8vw, 80px) 0; }
+  .pain .container { padding: 0 5vw; overflow: hidden; }
+  .pain .section-tag { font-size: .7rem; }
+  .pain-text h2 { font-size: clamp(1.8rem, 7vw, 2.5rem); }
+  .pain-text p { font-size: .95rem; }
+  .pain-counter-num { font-size: clamp(2.5rem, 10vw, 3.5rem); }
+  .pain-counter-label { font-size: .8rem; }
+  
+  .rejection-inbox { max-width: 100%; overflow: hidden; }
+  .inbox-window { border-radius: 14px; overflow: hidden; }
+  .rej-email { padding: 12px; gap: 10px; }
+  .rej-avatar { width: 32px; height: 32px; font-size: .6rem; }
+  .rej-sender { font-size: .78rem; }
+  .rej-subject { font-size: .72rem; }
+  .rej-preview { font-size: .68rem; }
+  
+  .how { padding: clamp(50px, 8vw, 80px) 0; }
+  .step-desc h3 { font-size: clamp(1.3rem, 5vw, 1.8rem); }
+  .step-desc p { font-size: .9rem; }
+  .jp-steps { font-size: 7px; letter-spacing: .5px; }
+  .journey-stage { min-height: 260px; padding: 16px; }
+  .j-scene { padding: 16px; }
+  
+  .wave-divider svg { min-height: 40px; }
+  .footer-zone { padding: 32px 5vw 20px; }
+  .footer-giant-logo { font-size: clamp(2.5rem, 11vw, 5rem); }
+  .footer-tagline { font-size: .85rem; margin-bottom: 24px; }
+  .footer-links a { font-size: .72rem; }
+  
+  .scroll-indicator { bottom: 20px; }
+  .scroll-label { font-size: .6rem; }
+  .scroll-arrow { width: 14px; height: 14px; }
+  
+  .cursor-blob, .cursor-blob-text { display: none; }
   body { cursor: auto; }
   a, button, input { cursor: pointer; }
 }
+
+/* Small phone */
+@media(max-width:380px) {
+  .hero-text h1 { font-size: 2rem; }
+  .hero-text .lead { font-size: .88rem; }
+  .float-card { min-width: 155px; padding: 14px; }
+  .fc-value { font-size: 1.15rem; }
+  .pain-text h2 { font-size: 1.7rem; }
+  .footer-giant-logo { font-size: 2.2rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   .reveal { opacity: 1; transform: none; }
@@ -682,7 +784,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click'
   jObs.observe(document.getElementById('journeyBox'));
 })();
 
-// Confetti burst
+// Confetti burst effect
 function burstConfetti(origin) {
   const rect = origin.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
@@ -701,7 +803,7 @@ function burstConfetti(origin) {
     const rotation = Math.random() * 720 - 360;
     const color = colors[Math.floor(Math.random() * colors.length)];
     const isCircle = Math.random() > 0.5;
-    dot.style.cssText = `position:absolute;left:${cx}px;top:${cy}px;width:${size}px;height:${isCircle ? size : size * 0.5}px;background:${color};border-radius:${isCircle ? '50%' : '2px'};opacity:1;transition:none;`;
+    dot.style.cssText = 'position:absolute;left:'+cx+'px;top:'+cy+'px;width:'+size+'px;height:'+(isCircle?size:size*0.5)+'px;background:'+color+';border-radius:'+(isCircle?'50%':'2px')+';opacity:1;';
     container.appendChild(dot);
     const start = performance.now();
     (function animate(dot, dx, dy, rotation) {
@@ -712,7 +814,7 @@ function burstConfetti(origin) {
         const y = cy + dy * t + 300 * t * t;
         const r = rotation * t;
         const o = Math.max(0, 1 - t / 1.2);
-        dot.style.transform = `translate(-50%,-50%) translate(${x - cx}px,${y - cy}px) rotate(${r}deg)`;
+        dot.style.transform = 'translate(-50%,-50%) translate('+(x-cx)+'px,'+(y-cy)+'px) rotate('+r+'deg)';
         dot.style.opacity = o;
         requestAnimationFrame(tick);
       });
@@ -721,7 +823,7 @@ function burstConfetti(origin) {
   setTimeout(() => container.remove(), 1500);
 }
 
-// Waitlist form
+// Waitlist form submission
 (function(){
   const emailInput = document.getElementById('waitlistEmail');
   const btn = document.getElementById('waitlistBtn');
@@ -730,10 +832,7 @@ function burstConfetti(origin) {
 
   async function handleSubmit() {
     const email = emailInput.value.trim();
-    if (!email) {
-      emailInput.focus();
-      return;
-    }
+    if (!email) { emailInput.focus(); return; }
     btn.disabled = true;
     btn.textContent = 'Joining…';
     msg.className = 'hero-note reveal stagger-3 visible';
@@ -750,7 +849,7 @@ function burstConfetti(origin) {
         msg.textContent = data.message || "You're on the list!";
         msg.classList.add('success');
         emailInput.value = '';
-        btn.textContent = 'You\'re in!';
+        btn.textContent = "You're in!";
         btn.classList.add('celebrating');
         burstConfetti(btn);
       } else if (res.status === 429) {
