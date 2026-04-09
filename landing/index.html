@@ -103,50 +103,51 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .nav-cta:hover { background: var(--coral) !important; transform: scale(1.04); }
 
 /* ========== HERO ========== */
-.hero { min-height: 100vh; display: flex; align-items: center; position: relative; overflow: hidden; padding: 120px 48px 80px; }
+.hero { min-height: 100vh; display: flex; align-items: center; position: relative; overflow: hidden; padding: 120px 5vw 80px; }
 .hero::before { content:''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
 .hero > * { position: relative; z-index: 1; }
-.hero-grid { max-width: 1300px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; width: 100%; }
+.hero-grid { margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; width: 100%; }
 .hero-text h1 { font-size: clamp(3rem, 5.5vw, 4.8rem); font-weight: 700; line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 24px; }
 .hero-text h1 em { font-style: italic; color: var(--coral); }
-.hero-text .lead { font-size: 1.05rem; line-height: 1.65; color: var(--ink-60); max-width: 440px; margin-bottom: 36px; font-weight: 300; }
-.hero-form { display: flex; gap: 10px; max-width: 420px; }
+.hero-text .lead { font-size: 1.05rem; line-height: 1.65; color: var(--ink-60); max-width: 520px; margin-bottom: 36px; font-weight: 300; }
+.hero-form { display: flex; gap: 10px; max-width: 500px; }
 .hero-form input { flex: 1; padding: 16px 22px; border: 1.5px solid var(--ink-10); border-radius: 100px; background: var(--white); font-family: var(--font); font-size: .92rem; font-weight: 300; color: var(--ink); outline: none; transition: all .3s; cursor: none; }
 .hero-form input::placeholder { color: var(--ink-30); }
 .hero-form input:focus { border-color: var(--coral); box-shadow: 0 0 0 4px var(--coral-glow); }
 .hero-form button { padding: 16px 28px; background: var(--coral); color: var(--white); border: none; border-radius: 100px; font-family: var(--font); font-size: .92rem; font-weight: 500; white-space: nowrap; transition: all .3s var(--ease); cursor: none; }
-.hero-form button:hover:not(:disabled) { background: #d4623b; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,115,74,0.3); }
-.hero-form button:disabled { opacity: .7; cursor: not-allowed; }
+.hero-form button:hover { background: #d4623b; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(232,115,74,0.3); }
 .hero-note { margin-top: 14px; font-size: .78rem; color: var(--ink-30); font-weight: 300; }
-.hero-note.success { color: var(--mint); font-weight: 500; }
-.hero-note.error { color: var(--coral); font-weight: 500; }
 
-/* Float cards */
+/* Float cards — draggable + floating */
 .hero-visual { position: relative; height: 520px; }
-.float-card { position: absolute; border-radius: 20px; padding: 24px; box-shadow: 0 8px 40px rgba(0,0,0,0.06); transition: transform .6s var(--ease); animation: floatY 6s ease-in-out infinite; }
-.float-card:hover { transform: translateY(-8px) rotate(0deg) !important; }
-.fc-1 { top: 0; left: 10%; background: var(--gold); color: var(--white); width: 240px; transform: rotate(-3deg); }
-.fc-2 { top: 40%; right: 0; background: var(--white); border: 1.5px solid var(--ink-10); width: 260px; transform: rotate(2deg); animation-delay: -2s; }
-.fc-3 { bottom: 0; left: 5%; background: var(--lavender); color: var(--white); width: 220px; transform: rotate(1.5deg); animation-delay: -4s; }
-.fc-4 { top: 20%; left: 38%; background: var(--coral); color: var(--white); width: 200px; transform: rotate(-1.5deg); animation-delay: -1s; }
+.float-card { position: absolute; border-radius: 20px; padding: 24px; box-shadow: 0 8px 40px rgba(0,0,0,0.06); cursor: grab; user-select: none; -webkit-user-select: none; animation: floatY 6s ease-in-out infinite; transition: box-shadow .3s var(--ease); }
+.float-card.dragging { cursor: grabbing; box-shadow: 0 20px 60px rgba(0,0,0,0.15); z-index: 100 !important; animation: none; }
+.float-card.snapping { animation: none; transition: transform .6s var(--ease), box-shadow .3s var(--ease); }
+.float-card:hover:not(.dragging) { box-shadow: 0 12px 48px rgba(0,0,0,0.1); }
 @keyframes floatY { 0%,100%{translate:0 0} 50%{translate:0 -14px} }
+.fc-1 { top: 0; left: 8%; background: var(--gold); color: var(--white); width: 230px; transform: rotate(-3deg); z-index: 1; }
+.fc-2 { top: 38%; right: 0; background: var(--white); border: 1.5px solid var(--ink-10); width: 250px; transform: rotate(2deg); z-index: 2; animation-delay: -2s; }
+.fc-3 { bottom: 0; left: 3%; background: var(--lavender); color: var(--white); width: 215px; transform: rotate(1.5deg); z-index: 3; animation-delay: -4s; }
+.fc-4 { top: 18%; left: 36%; background: var(--coral); color: var(--white); width: 200px; transform: rotate(-1.5deg); z-index: 4; animation-delay: -1s; }
+.fc-5 { top: 58%; left: 42%; background: var(--mint); color: var(--white); width: 210px; transform: rotate(2.5deg); z-index: 5; animation-delay: -3s; }
 .fc-label { font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; opacity: .7; margin-bottom: 8px; }
 .fc-value { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
 .fc-sub { font-size: .78rem; opacity: .7; margin-top: 6px; line-height: 1.4; }
 
 /* ========== PAIN SECTION — REJECTION INBOX ========== */
 .pain { padding: clamp(80px, 10vw, 140px) 0; position: relative; overflow: hidden; }
-.pain .container { max-width: 1360px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px); }
-.pain .section-tag { display: inline-block; font-size: 0.68rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-30); margin-bottom: 24px; }
+.pain .container { margin: 0 auto; padding: 0 5vw; }
+.pain .section-tag { display: inline-block; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--coral); margin-bottom: 20px; }
 .pain-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
-.pain-text { max-width: 480px; }
-.pain-text h2 { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: clamp(2rem, 3.8vw, 3.2rem); line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 16px; color: var(--ink); }
-.pain-text p { font-size: 0.95rem; color: var(--ink-60); font-weight: 300; line-height: 1.65; margin-bottom: 12px; }
-.pain-counter { margin-top: 32px; display: flex; align-items: baseline; gap: 10px; }
-.pain-counter-num { font-size: clamp(3rem, 6vw, 4.5rem); font-weight: 700; color: var(--coral); font-variant-numeric: tabular-nums; line-height: 1; }
-.pain-counter-label { font-size: 0.85rem; color: var(--ink-30); font-weight: 300; }
+.pain-text { }
+.pain-text h2 { font-family: var(--font); font-weight: 700; font-size: clamp(2.8rem, 5vw, 4.5rem); line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 24px; color: var(--ink); }
+.pain-text h2 em { font-style: italic; color: var(--coral); }
+.pain-text p { font-size: 1.1rem; color: var(--ink-60); font-weight: 300; line-height: 1.7; margin-bottom: 14px; }
+.pain-counter { margin-top: 40px; display: flex; align-items: baseline; gap: 14px; }
+.pain-counter-num { font-size: clamp(4rem, 8vw, 6rem); font-weight: 900; color: var(--coral); font-variant-numeric: tabular-nums; line-height: 1; }
+.pain-counter-label { font-size: 1rem; color: var(--ink-30); font-weight: 300; }
 
-.rejection-inbox { position: relative; width: 100%; max-width: 520px; }
+.rejection-inbox { position: relative; width: 100%; max-width: 580px; }
 .inbox-window { background: #fff; border: 1px solid rgba(27,27,27,0.08); border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.06); }
 .inbox-bar { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: rgba(27,27,27,0.02); border-bottom: 1px solid rgba(27,27,27,0.06); }
 .inbox-dots { display: flex; gap: 6px; }
@@ -170,9 +171,9 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .badge-noresponse { background: rgba(27,27,27,0.06); color: var(--ink-30); }
 .badge-automated { background: rgba(184,160,210,0.15); color: var(--lavender); }
 
-/* ========== HOW IT WORKS (Tabbed) ========== */
+/* ========== HOW IT WORKS — ANIMATED JOURNEY ========== */
 .how { padding: var(--section-pad) 0; background: var(--bg-cream); }
-.how .container { max-width: 1360px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 72px); }
+.how .container { margin: 0 auto; padding: 0 5vw; }
 .how-header { text-align: center; margin-bottom: 48px; }
 .how-header h2 { font-size: clamp(1.8rem, 3.5vw, 2.8rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--dark); }
 .how-header h2 .underline-wrap { position: relative; display: inline-block; }
@@ -183,68 +184,121 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .how-header p { font-size: 0.92rem; color: rgba(26,26,25,0.3); margin-top: 10px; font-weight: 400; }
 .how .section-tag { display: inline-block; font-size: 0.68rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(26,26,25,0.35); margin-bottom: 24px; }
 
-.how-tabs { display: flex; justify-content: center; gap: 8px; margin-bottom: 56px; }
-.how-tab { padding: 12px 28px; border-radius: 100px; border: 1.5px solid rgba(26,26,25,0.1); background: transparent; font-family: var(--sans); font-size: 0.88rem; font-weight: 500; color: rgba(26,26,25,0.6); cursor: pointer; transition: all 0.35s var(--ease); white-space: nowrap; }
-.how-tab:hover { border-color: rgba(26,26,25,0.3); color: var(--dark); }
-.how-tab.active { background: var(--dark); border-color: var(--dark); color: #fff; }
+/* Journey container */
+.journey-container { background: #fff; border: 1.5px solid var(--ink-10); border-radius: 20px; overflow: hidden; width: 100%; box-shadow: 0 4px 32px rgba(0,0,0,0.04); }
 
-.how-panels { position: relative; }
-.how-panel { display: none; grid-template-columns: 1fr 1.2fr; gap: 56px; align-items: center; animation: howPanelIn 0.5s var(--ease); }
-.how-panel.active { display: grid; }
-@keyframes howPanelIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+/* Two-column layout */
+.how-layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 56px; align-items: center; }
+.step-desc { display: none; }
+.step-desc.active { display: block; animation: stepFadeIn .5s var(--ease); }
+@keyframes stepFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.step-desc .sd-num { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; color: var(--coral); }
+.step-desc h3 { font-size: clamp(1.6rem, 2.5vw, 2.2rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 14px; font-style: italic; color: var(--dark); }
+.step-desc p { font-size: 0.95rem; color: var(--ink-60); line-height: 1.65; font-weight: 300; max-width: 480px; }
+.jp-step { cursor: pointer; transition: color .3s, transform .2s; }
+.jp-step:hover { color: var(--coral); transform: scale(1.05); }
+.journey-progress { padding: 16px 24px 12px; border-bottom: 1px solid var(--ink-10); }
+.jp-bar { height: 3px; background: var(--ink-10); border-radius: 3px; margin-bottom: 10px; overflow: hidden; }
+.jp-fill { height: 100%; background: var(--coral); border-radius: 3px; width: 0%; transition: width .8s ease; }
+.jp-steps { display: flex; justify-content: space-between; }
+.jp-step { font-size: 10px; font-weight: 600; color: var(--ink-30); text-transform: uppercase; letter-spacing: 1px; transition: color .4s; font-family: var(--font); }
+.jp-step.active { color: var(--coral); }
+.jp-step.done { color: var(--ink-60); }
 
-.panel-step-num { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 16px; }
-.pn-gold { color: var(--gold); } .pn-coral { color: var(--coral); } .pn-lavender { color: var(--lavender); }
-.panel-text h3 { font-size: clamp(1.6rem, 2.5vw, 2.2rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin-bottom: 14px; font-style: italic; color: var(--dark); }
-.panel-text p { font-size: 0.95rem; color: rgba(26,26,25,0.6); line-height: 1.65; font-weight: 300; max-width: 400px; }
+.journey-stage { position: relative; min-height: 360px; }
+.j-scene { position: absolute; inset: 0; padding: 24px; display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(16px); transition: opacity .5s ease, transform .5s ease; pointer-events: none; }
+.j-scene.active { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
-.panel-mockup { background: #fff; border-radius: 20px; border: 1.5px solid rgba(26,26,25,0.1); box-shadow: 0 4px 32px rgba(0,0,0,0.04); padding: 28px; min-height: 340px; position: relative; overflow: hidden; }
-.mock-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.mock-title { font-size: 0.95rem; font-weight: 600; color: var(--dark); }
-.mock-btn { padding: 8px 16px; border-radius: 100px; font-size: 0.75rem; font-weight: 600; border: none; color: #fff; font-family: var(--sans); }
-.btn-coral-mock { background: var(--coral); }
-.mock-url { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg-cream); border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(26,26,25,0.05); }
-.mock-url .link-icon { width: 18px; height: 18px; border-radius: 50%; background: rgba(26,26,25,0.1); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; color: rgba(26,26,25,0.3); }
-.url-input { flex: 1; border: none; background: transparent; font-family: var(--sans); font-size: 0.82rem; color: var(--dark); outline: none; min-width: 0; }
-.url-input::placeholder { color: rgba(26,26,25,0.3); }
-.mock-url .add-btn { padding: 6px 14px; background: var(--coral); color: #fff; border: none; border-radius: 8px; font-size: 0.72rem; font-weight: 600; font-family: var(--sans); flex-shrink: 0; cursor: pointer; transition: all 0.25s var(--ease); }
-.mock-url .add-btn:hover { background: #d4623b; transform: scale(1.05); }
-.mock-jobs { display: flex; flex-direction: column; }
-.mock-job { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(26,26,25,0.05); }
-.mock-job:last-child { border-bottom: none; }
-.mock-job.new-job { animation: jobSlideIn 0.5s var(--ease); }
-@keyframes jobSlideIn { from { opacity: 0; transform: translateY(-10px); max-height: 0; padding: 0; } to { opacity: 1; transform: translateY(0); max-height: 80px; padding: 14px 0; } }
-.job-role { font-size: 0.88rem; font-weight: 600; margin-bottom: 2px; color: var(--dark); }
-.job-company { font-size: 0.75rem; color: rgba(26,26,25,0.3); font-weight: 400; }
-.job-tags { display: flex; gap: 6px; align-items: center; }
-.how-tag { padding: 4px 10px; border-radius: 100px; font-size: 0.65rem; font-weight: 600; }
-.how-tag-interested { background: rgba(232,168,56,0.12); color: var(--gold); }
-.how-tag-outreach { background: rgba(232,115,74,0.12); color: var(--coral); }
-.how-tag-replied { background: rgba(107,191,138,0.15); color: var(--mint); }
-.how-tag-selected { background: var(--dark); color: #fff; }
-.how-tag-high { background: rgba(232,115,74,0.12); color: var(--coral); }
-.how-tag-medium { background: rgba(232,168,56,0.12); color: var(--gold); }
-.new-badge { display: inline-block; padding: 2px 8px; border-radius: 100px; font-size: 0.6rem; font-weight: 600; background: rgba(107,191,138,0.15); color: var(--mint); margin-left: 6px; animation: badgePulse 1s ease-in-out 2; }
-@keyframes badgePulse { 50% { transform: scale(1.1); } }
-.mock-contacts { display: flex; flex-direction: column; }
-.mock-contact { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid rgba(26,26,25,0.05); }
-.mock-contact:last-child { border-bottom: none; }
-.contact-avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(26,26,25,0.05); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 600; color: rgba(26,26,25,0.3); flex-shrink: 0; }
-.contact-info { flex: 1; } .contact-name { font-size: 0.88rem; font-weight: 600; margin-bottom: 1px; color: var(--dark); } .contact-role { font-size: 0.75rem; color: rgba(26,26,25,0.3); }
-.contact-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; } .contact-source { font-size: 0.65rem; color: rgba(26,26,25,0.3); }
-.mock-msg-header { margin-bottom: 12px; } .mock-msg-for { font-size: 0.78rem; color: rgba(26,26,25,0.3); margin-top: 2px; }
-.mock-msg-body { background: var(--bg-cream); border-radius: 12px; padding: 18px 20px; font-family: 'Courier New', monospace; font-size: 0.76rem; line-height: 1.65; color: var(--dark); margin-bottom: 14px; border: 1px solid rgba(26,26,25,0.05); max-height: 220px; overflow-y: auto; }
-.mock-msg-body p { margin-bottom: 8px; } .mock-msg-body p:last-child { margin-bottom: 0; }
-.mock-msg-actions { display: flex; gap: 10px; }
-.msg-btn { padding: 10px 20px; border-radius: 100px; font-size: 0.78rem; font-weight: 600; font-family: var(--sans); border: none; cursor: pointer; }
-.msg-copy { background: #fff; border: 1.5px solid rgba(26,26,25,0.1); color: var(--dark); }
-.msg-send { background: var(--dark); color: #fff; }
+/* Scene 1: Browser */
+.j-browser { width: 100%; background: var(--bg); border-radius: 12px; overflow: hidden; border: 1px solid var(--ink-10); }
+.j-browser-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff; border-bottom: 1px solid var(--ink-10); }
+.j-dots { display: flex; gap: 5px; }
+.j-dots span { width: 8px; height: 8px; border-radius: 50%; }
+.j-dots span:nth-child(1) { background: #ff5f57; }
+.j-dots span:nth-child(2) { background: #ffbd2e; }
+.j-dots span:nth-child(3) { background: #28c840; }
+.j-url-bar { flex: 1; font-size: 11px; color: var(--ink-30); background: var(--bg); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--ink-10); font-family: var(--font); }
+.j-browser-body { padding: 20px; }
+.j-listing { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.j-listing-logo { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; font-family: var(--font); flex-shrink: 0; }
+.j-listing-title { font-size: 15px; font-weight: 600; color: var(--ink); font-family: var(--font); }
+.j-listing-company { font-size: 12px; color: var(--ink-30); margin-top: 2px; font-family: var(--font); }
+.j-copy-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; background: #fff; border: 1px solid var(--ink-10); border-radius: 8px; font-size: 12px; color: var(--ink-60); transition: all .3s; font-family: var(--font); }
+.j-copy-btn.clicked { background: var(--coral); color: #fff; border-color: var(--coral); }
+.j-copied-toast { display: inline-block; margin-left: 10px; font-size: 11px; color: var(--coral); font-weight: 600; opacity: 0; transition: opacity .3s; }
+.j-copied-toast.show { opacity: 1; }
+
+/* Scene 2: Dashboard paste */
+.j-dashboard { width: 100%; }
+.j-dash-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.j-dash-logo { font-family: var(--font); font-size: 14px; font-weight: 800; color: var(--ink); }
+.j-dash-label { font-size: 11px; color: var(--ink-30); text-transform: uppercase; letter-spacing: 1px; font-family: var(--font); }
+.j-dash-url { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg); border: 1px solid var(--ink-10); border-radius: 10px; margin-bottom: 16px; }
+.j-typing-url { flex: 1; font-size: 12px; color: var(--coral); font-family: monospace; min-height: 18px; }
+.j-typing-cursor { display: inline-block; width: 2px; height: 14px; background: var(--coral); animation: jBlink .6s step-end infinite; vertical-align: middle; margin-left: 1px; }
+@keyframes jBlink { 50% { opacity: 0; } }
+.j-dash-add { padding: 5px 12px; background: var(--coral); color: #fff; border: none; border-radius: 8px; font-size: 11px; font-weight: 600; font-family: var(--font); opacity: 0.4; transition: opacity .3s; }
+.j-dash-add.ready { opacity: 1; }
+.j-dash-card { background: var(--bg); border: 1px solid var(--ink-10); border-radius: 12px; padding: 16px; opacity: 0; transform: translateY(10px); transition: all .5s ease; }
+.j-dash-card.show { opacity: 1; transform: translateY(0); }
+.j-dash-card-inner { display: flex; align-items: center; gap: 12px; }
+.j-status { padding: 4px 10px; border-radius: 100px; font-size: 10px; font-weight: 600; font-family: var(--font); }
+.j-status-new { background: rgba(232,115,74,0.12); color: var(--coral); }
+
+/* Scene 3: Contacts */
+.j-contacts-panel { width: 100%; }
+.j-cp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.j-cp-title { font-size: 14px; font-weight: 600; color: var(--ink); font-family: var(--font); }
+.j-cp-badge { font-size: 10px; color: var(--coral); background: rgba(232,115,74,0.1); padding: 3px 10px; border-radius: 100px; font-family: var(--font); }
+.j-contact { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--ink-10); opacity: 0; transform: translateX(-12px); transition: all .4s ease; }
+.j-contact.show { opacity: 1; transform: translateX(0); }
+.j-contact:last-child { border-bottom: none; }
+.j-c-av { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; font-family: var(--font); }
+.j-c-name { font-size: 13px; font-weight: 600; color: var(--ink); font-family: var(--font); }
+.j-c-role { font-size: 11px; color: var(--ink-30); font-family: var(--font); }
+.j-c-tag { padding: 3px 8px; border-radius: 100px; font-size: 9px; font-weight: 600; font-family: var(--font); }
+.j-ct-high { background: rgba(232,115,74,0.12); color: var(--coral); }
+.j-ct-med { background: rgba(232,168,56,0.12); color: var(--gold); }
+.j-ct-rec { background: rgba(184,160,210,0.12); color: var(--lavender); }
+
+/* Scene 4: Message */
+.j-msg-panel { width: 100%; }
+.j-msg-to { font-size: 12px; color: var(--ink-30); margin-bottom: 14px; font-family: var(--font); }
+.j-msg-to strong { color: var(--ink); }
+.j-msg-body { background: var(--bg); border: 1px solid var(--ink-10); border-radius: 10px; padding: 18px; font-size: 13px; color: var(--ink-60); line-height: 1.7; min-height: 100px; margin-bottom: 14px; font-family: var(--font); }
+.j-msg-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.j-msg-btn { font-size: 11px; padding: 6px 14px; border-radius: 100px; border: none; font-family: var(--font); }
+.j-mb-alt { background: #fff; color: var(--ink-60); border: 1px solid var(--ink-10); }
+.j-mb-send { background: var(--coral); color: #fff; font-weight: 600; }
+
+/* Scene 5: Timeline */
+.j-status-panel { width: 100%; text-align: center; }
+.j-sent-check { width: 48px; height: 48px; border-radius: 50%; background: rgba(232,115,74,0.12); color: var(--coral); font-size: 22px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; animation: jPopIn .5s ease; }
+@keyframes jPopIn { from { transform: scale(0); } to { transform: scale(1); } }
+.j-sent-title { font-size: 15px; font-weight: 600; margin-bottom: 20px; color: var(--ink); font-family: var(--font); }
+.j-timeline { text-align: left; max-width: 320px; margin: 0 auto; }
+.j-tl-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 12px; color: var(--ink-30); opacity: 0; transform: translateY(8px); transition: all .4s ease; font-family: var(--font); }
+.j-tl-item.show { opacity: 1; transform: translateY(0); }
+.j-tl-item span:nth-child(2) { flex: 1; }
+.j-tl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-10); flex-shrink: 0; transition: background .3s; }
+.j-tl-item.show .j-tl-dot { background: var(--coral); }
+.j-tl-time { font-size: 10px; color: var(--ink-30); }
+.j-tl-item.show span:nth-child(2) { color: var(--ink); }
+
+/* Scene 6: Celebration */
+.j-final-panel { width: 100%; text-align: center; }
+.j-final-icon { font-size: 48px; margin-bottom: 12px; animation: jPopIn .6s ease; }
+.j-final-title { font-family: var(--font); font-size: 24px; font-weight: 800; color: var(--coral); margin-bottom: 6px; }
+.j-final-role { font-size: 14px; color: var(--ink-30); margin-bottom: 20px; font-family: var(--font); }
+.j-final-stats { display: flex; justify-content: center; gap: 24px; font-size: 13px; color: var(--ink-30); margin-bottom: 20px; font-family: var(--font); }
+.j-final-stats strong { color: var(--ink); display: block; font-size: 20px; font-weight: 700; }
+.j-final-cta { display: inline-block; padding: 8px 20px; background: var(--coral); color: #fff; border-radius: 100px; font-size: 12px; font-weight: 600; font-family: var(--font); }
 
 /* ========== FOOTER ========== */
 .wave-divider { line-height: 0; margin-bottom: -1px; }
 .wave-divider svg { display: block; width: 100%; height: auto; min-height: 70px; }
-.footer-zone { background: var(--orange-bg); padding: clamp(40px, 5vw, 64px) clamp(28px, 5vw, 64px) 28px; }
-.footer-inner { max-width: 1400px; margin: 0 auto; }
+.footer-zone { background: var(--orange-bg); padding: clamp(40px, 5vw, 64px) 5vw 28px; }
+.footer-inner { margin: 0 auto; }
 .footer-giant-logo { font-size: clamp(5rem, 14vw, 12rem); font-weight: 900; line-height: 0.95; letter-spacing: -0.04em; color: var(--white); margin-bottom: 8px; }
 .footer-giant-logo .dot-ai { color: var(--coral); }
 .footer-tagline { font-size: clamp(0.88rem, 1.5vw, 1.1rem); font-weight: 500; color: var(--white); margin-bottom: 40px; }
@@ -258,19 +312,16 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 @media(max-width:900px) {
   .hero-grid { grid-template-columns: 1fr; gap: 48px; }
   .hero-visual { height: 380px; }
-  .hero { padding: 120px 24px 60px; }
+  .hero { padding: 120px 5vw 60px; }
 }
 @media (max-width: 768px) {
   .pain-layout { grid-template-columns: 1fr; gap: 48px; }
   .rejection-inbox { max-width: 100%; }
-  .pain-text { max-width: 100%; }
-  .how-tabs { flex-wrap: wrap; justify-content: center; }
-  .how-tab { padding: 10px 20px; font-size: 0.82rem; }
-  .how-panel { grid-template-columns: 1fr; gap: 32px; }
-  .how-panel.active { display: grid; }
-  .panel-mockup { min-height: auto; }
+  .how-layout { grid-template-columns: 1fr; gap: 32px; }
   .footer-bottom { flex-direction: column; gap: 16px; align-items: flex-start; }
   .footer-links { gap: 16px; }
+  .jp-steps { font-size: 8px; }
+  .journey-stage { min-height: 300px; }
 }
 @media(max-width:600px) {
   .hero-form { flex-direction: column; }
@@ -308,17 +359,18 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
     <div class="hero-text">
       <h1 class="reveal">Land jobs through <em>people</em>, not portals</h1>
       <p class="lead reveal stagger-1">Stop sending resumes into the void. Referro.ai finds the right humans at your target companies and helps you write messages they'll actually read.</p>
-      <div class="hero-form reveal stagger-2" id="waitlistForm">
-        <input type="email" placeholder="you@email.com" aria-label="Email" id="waitlistEmail">
-        <button type="button" id="waitlistBtn">Join the Waitlist →</button>
+      <div class="hero-form reveal stagger-2">
+        <input type="email" placeholder="you@email.com" aria-label="Email">
+        <button type="button">Join the Waitlist →</button>
       </div>
-      <p class="hero-note reveal stagger-3" id="waitlistMsg">Free early access. No spam, ever.</p>
+      <p class="hero-note reveal stagger-3">Free early access. No spam, ever.</p>
     </div>
     <div class="hero-visual reveal stagger-2">
-      <div class="float-card fc-1"><div class="fc-label">Daily Goal</div><div class="fc-value">3 / 5</div><div class="fc-sub">Outreach messages sent today</div></div>
-      <div class="float-card fc-4"><div class="fc-label">New Contact</div><div class="fc-value">Sarah L.</div><div class="fc-sub">Engineering Manager @ Stripe</div></div>
-      <div class="float-card fc-2"><div class="fc-label">Message Status</div><div class="fc-value" style="color:var(--mint);font-size:1.3rem;">✓ Opened</div><div class="fc-sub">Your outreach to Google was read 2h ago</div></div>
-      <div class="float-card fc-3"><div class="fc-label">Connections</div><div class="fc-value">12</div><div class="fc-sub">People found this week</div></div>
+      <div class="float-card fc-1"><div class="fc-label">No More</div><div class="fc-value">Black Holes</div><div class="fc-sub">Stop sending resumes into the void. Get seen by real people.</div></div>
+      <div class="float-card fc-4"><div class="fc-label">Your Network</div><div class="fc-value">Built for you</div><div class="fc-sub">AI finds the right contacts at every company you target</div></div>
+      <div class="float-card fc-2"><div class="fc-label">Skip the ATS</div><div class="fc-value" style="color:var(--mint);font-size:1.3rem;">✓ Seen</div><div class="fc-sub">Get past the machines. Land in front of actual humans.</div></div>
+      <div class="float-card fc-3"><div class="fc-label">Outreach</div><div class="fc-value">That works</div><div class="fc-sub">Messages people actually read and reply to</div></div>
+      <div class="float-card fc-5"><div class="fc-label">No More</div><div class="fc-value">Ghosting</div><div class="fc-sub">Track every message. Know when they open, read, and reply.</div></div>
     </div>
   </div>
 </section>
@@ -329,9 +381,8 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
     <div class="pain-layout">
       <div class="pain-text reveal">
         <span class="section-tag">The problem</span>
-        <h2>Do any of these<br>sound familiar?</h2>
-        <p>You open your inbox hoping for an interview. Instead, it's another wave of automated rejections — or worse, total silence.</p>
-        <p>You're not the problem. The system is.</p>
+        <h2>Do any of these<br>sound <em>familiar</em>?</h2>
+        <p>You're not unqualified. The system is broken — designed to filter you out before anyone sees your name.</p>
         <div class="pain-counter"><div class="pain-counter-num" id="rejCount">0</div><div class="pain-counter-label">rejections and counting…</div></div>
       </div>
       <div class="rejection-inbox reveal" style="transition-delay: 0.2s" id="rejInbox">
@@ -348,7 +399,7 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
   </div>
 </section>
 
-<!-- ==================== HOW IT WORKS ==================== -->
+<!-- ==================== HOW IT WORKS — JOURNEY ==================== -->
 <section class="how" id="how">
   <div class="container">
     <div class="how-header reveal">
@@ -356,66 +407,115 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
       <h2>See how it <span class="underline-wrap">works<svg class="underline-svg" viewBox="0 0 120 12" preserveAspectRatio="none"><path d="M0 8 Q8 2 16 8 Q24 14 32 8 Q40 2 48 8 Q56 14 64 8 Q72 2 80 8 Q88 14 96 8 Q104 2 112 8 L120 8"/></svg></span></h2>
       <p>Three steps. Real product. No smoke and mirrors.</p>
     </div>
-    <div class="how-tabs reveal">
-      <button class="how-tab active" data-how-tab="paste">01 — Paste a job</button>
-      <button class="how-tab" data-how-tab="discover">02 — Discover contacts</button>
-      <button class="how-tab" data-how-tab="reach">03 — Reach out</button>
-    </div>
-    <div class="how-panels">
-      <div class="how-panel active" id="how-panel-paste">
-        <div class="panel-text">
-          <div class="panel-step-num pn-gold">Step 01</div>
+    <div class="how-layout">
+      <!-- Left: Step descriptions that sync with the journey -->
+      <div class="how-left reveal">
+        <div class="step-desc active" data-step="0">
+          <div class="sd-num">Step 01</div>
+          <h3>Find a job you love</h3>
+          <p>Spot a role on LinkedIn, Indeed, or anywhere. Copy the link — Referro takes it from there.</p>
+        </div>
+        <div class="step-desc" data-step="1">
+          <div class="sd-num">Step 01</div>
           <h3>Drop in any job posting</h3>
-          <p>Paste a URL or add it manually. Referoo parses the role, company, requirements — everything. Your job board, organized.</p>
+          <p>Paste a URL or add it manually. Referro parses the role, company, requirements — everything. Your job board, organized.</p>
         </div>
-        <div class="panel-mockup">
-          <div class="mock-header"><span class="mock-title">Jobs Created</span><button class="mock-btn btn-coral-mock">+ Create Job</button></div>
-          <div class="mock-url"><div class="link-icon">🔗</div><input type="text" class="url-input" placeholder="Paste a job URL and press Add — try it!" /><button class="add-btn" id="addJobBtn">Add</button></div>
-          <div class="mock-jobs" id="jobsList">
-            <div class="mock-job"><div class="job-info"><div class="job-role">Senior Product Manager</div><div class="job-company">Stripe</div></div><div class="job-tags"><span class="how-tag how-tag-interested">Interested</span></div></div>
-            <div class="mock-job"><div class="job-info"><div class="job-role">Growth Lead</div><div class="job-company">Notion</div></div><div class="job-tags"><span class="how-tag how-tag-outreach">Outreach Sent</span></div></div>
-            <div class="mock-job"><div class="job-info"><div class="job-role">Head of Partnerships</div><div class="job-company">Figma</div></div><div class="job-tags"><span class="how-tag how-tag-replied">Replied</span></div></div>
-          </div>
-        </div>
-      </div>
-      <div class="how-panel" id="how-panel-discover">
-        <div class="panel-text">
-          <div class="panel-step-num pn-coral">Step 02</div>
+        <div class="step-desc" data-step="2">
+          <div class="sd-num">Step 02</div>
           <h3>We find your way in</h3>
-          <p>AI scans the company and surfaces hiring managers, recruiters, and insiders who can champion your application. No more guessing who to reach out to.</p>
+          <p>AI scans the company and surfaces hiring managers, recruiters, and insiders who can champion your application.</p>
         </div>
-        <div class="panel-mockup">
-          <div class="mock-header"><span class="mock-title">Who to Reach Out To</span></div>
-          <div class="mock-contacts">
-            <div class="mock-contact"><div class="contact-avatar">SC</div><div class="contact-info"><div class="contact-name">Sarah Chen</div><div class="contact-role">Engineering Manager</div></div><div class="contact-meta"><span class="how-tag how-tag-selected">Selected</span><span class="contact-source">via LinkedIn</span></div></div>
-            <div class="mock-contact"><div class="contact-avatar">MW</div><div class="contact-info"><div class="contact-name">Marcus Williams</div><div class="contact-role">Senior Recruiter</div></div><div class="contact-meta"><span class="how-tag how-tag-high">High</span><span class="contact-source">via Company page</span></div></div>
-            <div class="mock-contact"><div class="contact-avatar">PP</div><div class="contact-info"><div class="contact-name">Priya Patel</div><div class="contact-role">Team Lead</div></div><div class="contact-meta"><span class="how-tag how-tag-medium">Medium</span><span class="contact-source">via Mutual connection</span></div></div>
-          </div>
-        </div>
-      </div>
-      <div class="how-panel" id="how-panel-reach">
-        <div class="panel-text">
-          <div class="panel-step-num pn-lavender">Step 03</div>
+        <div class="step-desc" data-step="3">
+          <div class="sd-num">Step 03</div>
           <h3>Messages that actually land</h3>
-          <p>AI crafts personalized outreach that feels human — referencing mutual connections, shared interests, and specific details. Copy, send, and get replies.</p>
+          <p>AI crafts personalized outreach that feels human — referencing mutual connections, shared interests, and specific details.</p>
         </div>
-        <div class="panel-mockup">
-          <div class="mock-msg-header"><span class="mock-title">Outreach Message</span><div class="mock-msg-for">Prepared for: <strong>Sarah Chen</strong></div></div>
-          <div class="mock-msg-body">
-            <p>Hi Sarah,</p>
-            <p>I noticed you lead the payments team at Stripe — really impressive work on the new invoicing API.</p>
-            <p>I'm exploring PM roles and your team caught my eye. I led a similar billing migration at my last company (cut churn 23%).</p>
-            <p>Would you be open to a 15-min chat?</p>
-            <p>Best, Alex</p>
-          </div>
-          <div class="mock-msg-actions"><button class="msg-btn msg-copy">📋 Copy</button><button class="msg-btn msg-send">✉ Mark as Sent</button></div>
+        <div class="step-desc" data-step="4">
+          <div class="sd-num">Step 04</div>
+          <h3>Track every touchpoint</h3>
+          <p>See when your message is delivered, opened, and replied to. Follow-ups happen automatically at the right time.</p>
+        </div>
+        <div class="step-desc" data-step="5">
+          <div class="sd-num">Step 05</div>
+          <h3>Land the role</h3>
+          <p>Skip the black hole. Go straight to the people who matter. That's how you get hired in 2026.</p>
         </div>
       </div>
-    </div>
+
+      <!-- Right: Journey animation -->
+      <div class="journey-container reveal" id="journeyBox">
+      <div class="journey-progress">
+        <div class="jp-bar"><div class="jp-fill" id="jpFill"></div></div>
+        <div class="jp-steps">
+          <span class="jp-step active" data-s="0">Find</span>
+          <span class="jp-step" data-s="1">Paste</span>
+          <span class="jp-step" data-s="2">Contacts</span>
+          <span class="jp-step" data-s="3">Outreach</span>
+          <span class="jp-step" data-s="4">Sent</span>
+          <span class="jp-step" data-s="5">Landed</span>
+        </div>
+      </div>
+      <div class="journey-stage" id="journeyStage">
+        <div class="j-scene active" id="js-0">
+          <div class="j-browser">
+            <div class="j-browser-bar"><div class="j-dots"><span></span><span></span><span></span></div><div class="j-url-bar">linkedin.com/jobs/senior-pm-stripe</div></div>
+            <div class="j-browser-body">
+              <div class="j-listing"><div class="j-listing-logo" style="background:#635BFF;color:#fff">S</div><div><div class="j-listing-title">Senior Product Manager</div><div class="j-listing-company">Stripe · Toronto · Full-time</div></div></div>
+              <div class="j-copy-btn" id="jCopyBtn"><span>📋</span> Copy link</div>
+              <div class="j-copied-toast" id="jCopiedToast">Copied!</div>
+            </div>
+          </div>
+        </div>
+        <div class="j-scene" id="js-1">
+          <div class="j-dashboard">
+            <div class="j-dash-header"><span class="j-dash-logo">Referro<span style="color:var(--coral)">.ai</span></span><span class="j-dash-label">Dashboard</span></div>
+            <div class="j-dash-url"><span>🔗</span><div class="j-typing-url" id="jTypingUrl"></div><button class="j-dash-add" id="jDashAdd">Add</button></div>
+            <div class="j-dash-card" id="jDashCard">
+              <div class="j-dash-card-inner"><div class="j-listing-logo" style="background:#635BFF;color:#fff">S</div><div style="flex:1"><div class="j-listing-title">Senior Product Manager</div><div class="j-listing-company">Stripe · Toronto</div></div><span class="j-status j-status-new">New</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="j-scene" id="js-2">
+          <div class="j-contacts-panel">
+            <div class="j-cp-header"><span class="j-cp-title">Contacts found</span><span class="j-cp-badge">3 people</span></div>
+            <div class="j-contact" id="jc1"><div class="j-c-av" style="background:var(--lavender);color:#fff">SC</div><div style="flex:1"><div class="j-c-name">Sarah Chen</div><div class="j-c-role">Engineering Manager</div></div><span class="j-c-tag j-ct-high">High match</span></div>
+            <div class="j-contact" id="jc2"><div class="j-c-av" style="background:var(--gold);color:#fff">MK</div><div style="flex:1"><div class="j-c-name">Mike Kumar</div><div class="j-c-role">PM Lead</div></div><span class="j-c-tag j-ct-med">Medium</span></div>
+            <div class="j-contact" id="jc3"><div class="j-c-av" style="background:var(--mint);color:#fff">LR</div><div style="flex:1"><div class="j-c-name">Lisa Rivera</div><div class="j-c-role">Recruiter</div></div><span class="j-c-tag j-ct-rec">Recruiter</span></div>
+          </div>
+        </div>
+        <div class="j-scene" id="js-3">
+          <div class="j-msg-panel">
+            <div class="j-msg-to">To: <strong>Sarah Chen</strong> · Engineering Manager</div>
+            <div class="j-msg-body" id="jMsgBody"></div>
+            <div class="j-msg-actions"><button class="j-msg-btn j-mb-alt">Try another angle</button><button class="j-msg-btn j-mb-send" id="jSendBtn">Send message</button></div>
+          </div>
+        </div>
+        <div class="j-scene" id="js-4">
+          <div class="j-status-panel">
+            <div class="j-sent-check">✓</div>
+            <div class="j-sent-title">Message sent to Sarah Chen</div>
+            <div class="j-timeline">
+              <div class="j-tl-item" id="jt1"><span class="j-tl-dot"></span><span>Message delivered</span><span class="j-tl-time">Just now</span></div>
+              <div class="j-tl-item" id="jt2"><span class="j-tl-dot"></span><span>Opened</span><span class="j-tl-time">2h later</span></div>
+              <div class="j-tl-item" id="jt3"><span class="j-tl-dot"></span><span>Sarah replied!</span><span class="j-tl-time">Next day</span></div>
+              <div class="j-tl-item" id="jt4"><span class="j-tl-dot"></span><span>Meeting booked</span><span class="j-tl-time">Day 3</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="j-scene" id="js-5">
+          <div class="j-final-panel">
+            <div class="j-final-icon">🎉</div>
+            <div class="j-final-title">You landed the role</div>
+            <div class="j-final-role">Senior Product Manager · Stripe</div>
+            <div class="j-final-stats"><div><strong>4</strong>contacts reached</div><div><strong>2</strong>replies received</div><div><strong>1</strong>offer accepted</div></div>
+            <div class="j-final-cta">This could be you →</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end journey-container -->
+    </div><!-- end how-layout -->
   </div>
 </section>
-
-<!-- ==================== FOOTER ==================== -->
 <div class="wave-divider">
   <svg viewBox="0 0 1440 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M0,40 C200,110 500,120 720,80 C940,40 1200,90 1440,55 L1440,120 L0,120 Z" fill="#F5B88A" opacity="0.45"/>
@@ -457,8 +557,59 @@ document.querySelectorAll('.reveal').forEach(el=>revObs.observe(el));
 const zigzagObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('drawn')})},{threshold:.5});
 document.querySelectorAll('.underline-wrap').forEach(el=>zigzagObs.observe(el));
 
-// Parallax hero cards
-window.addEventListener('scroll',()=>{const s=window.scrollY;document.querySelectorAll('.float-card').forEach((c,i)=>{const sp=[.03,-.02,.025,-.015][i]||.02;c.style.translate=`0 ${s*sp}px`})},{passive:true});
+// Draggable hero cards — drag to peek, snaps back, resumes floating
+(function(){
+  const cards = document.querySelectorAll('.float-card');
+  let topZ = 10;
+
+  cards.forEach(card => {
+    let isDragging = false, startX, startY, dx, dy;
+
+    function pointerDown(e) {
+      e.preventDefault();
+      isDragging = true;
+      card.classList.remove('snapping');
+      card.classList.add('dragging');
+      topZ++;
+      card.style.zIndex = topZ;
+      startX = e.clientX || e.touches[0].clientX;
+      startY = e.clientY || e.touches[0].clientY;
+      dx = 0; dy = 0;
+    }
+
+    function pointerMove(e) {
+      if (!isDragging) return;
+      e.preventDefault();
+      const cx = e.clientX || (e.touches && e.touches[0].clientX);
+      const cy = e.clientY || (e.touches && e.touches[0].clientY);
+      if (!cx) return;
+      let rawDx = cx - startX;
+      let rawDy = cy - startY;
+      dx = rawDx * (1 - Math.min(Math.abs(rawDx) / 500, 0.6));
+      dy = rawDy * (1 - Math.min(Math.abs(rawDy) / 500, 0.6));
+      const tilt = dx * 0.03;
+      card.style.transform = `translate(${dx}px, ${dy}px) rotate(${tilt}deg)`;
+    }
+
+    function pointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      card.classList.remove('dragging');
+      card.classList.add('snapping');
+      card.style.transform = '';
+      // Resume floating animation after snap-back
+      setTimeout(() => { card.classList.remove('snapping'); }, 650);
+    }
+
+    card.addEventListener('mousedown', pointerDown);
+    window.addEventListener('mousemove', pointerMove);
+    window.addEventListener('mouseup', pointerUp);
+    card.addEventListener('touchstart', pointerDown, { passive: false });
+    window.addEventListener('touchmove', pointerMove, { passive: false });
+    window.addEventListener('touchend', pointerUp);
+  });
+})();
+
 
 // Smooth scroll
 document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click',e=>{e.preventDefault();const t=document.querySelector(a.getAttribute('href'));if(t)t.scrollIntoView({behavior:'smooth',block:'start'})})});
@@ -486,66 +637,46 @@ document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click'
   io.observe(document.getElementById('rejInbox'));
 })();
 
-// How It Works tabs
-const howTabs=document.querySelectorAll('.how-tab'),howPanels=document.querySelectorAll('.how-panel');
-howTabs.forEach(tab=>{tab.addEventListener('click',()=>{howTabs.forEach(t=>t.classList.remove('active'));howPanels.forEach(p=>p.classList.remove('active'));tab.classList.add('active');document.getElementById('how-panel-'+tab.dataset.howTab).classList.add('active')})});
-
-// Job URL parser
-const urlInput=document.querySelector('.url-input'),addBtn=document.getElementById('addJobBtn'),jobsList=document.getElementById('jobsList');
-const companies={'google':'Google','stripe':'Stripe','meta':'Meta','apple':'Apple','amazon':'Amazon','netflix':'Netflix','spotify':'Spotify','notion':'Notion','figma':'Figma','airbnb':'Airbnb','uber':'Uber','slack':'Slack','microsoft':'Microsoft','tesla':'Tesla','openai':'OpenAI','anthropic':'Anthropic','vercel':'Vercel','shopify':'Shopify','linkedin':'LinkedIn','adobe':'Adobe','salesforce':'Salesforce','datadog':'Datadog','coinbase':'Coinbase','robinhood':'Robinhood','plaid':'Plaid'};
-function parseJobURL(input){const text=input.trim().toLowerCase();let company='Unknown Company';for(const[key,name]of Object.entries(companies)){if(text.includes(key)){company=name;break}}let role='New Position';const slugMatch=text.match(/(?:jobs?|positions?|careers?|roles?)[\/\-]([a-z0-9\-]+)/);if(slugMatch){role=slugMatch[1].replace(/-at-.*/,'').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).substring(0,40)}else if(!text.startsWith('http')){role=input.trim().substring(0,40)}if(role==='New Position'&&text.includes('.com')){const parts=text.split('/').filter(p=>p.length>3&&!p.includes('.'));if(parts.length>0){role=parts[parts.length-1].replace(/[_-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase()).substring(0,40)}}return{role,company}}
-function addJob(){const val=urlInput.value.trim();if(!val){urlInput.style.borderColor='var(--coral)';urlInput.setAttribute('placeholder','Type something — a URL or job title!');setTimeout(()=>{urlInput.style.borderColor='';urlInput.setAttribute('placeholder','Paste a job URL and press Add — try it!')},1500);return}const{role,company}=parseJobURL(val);const statuses=['how-tag-interested','how-tag-outreach','how-tag-replied'];const labels=['Interested','Outreach Sent','Replied'];const ri=Math.floor(Math.random()*3);const jobEl=document.createElement('div');jobEl.className='mock-job new-job';jobEl.innerHTML=`<div class="job-info"><div class="job-role">${role}<span class="new-badge">New</span></div><div class="job-company">${company}</div></div><div class="job-tags"><span class="how-tag ${statuses[ri]}">${labels[ri]}</span></div>`;jobsList.insertBefore(jobEl,jobsList.firstChild);urlInput.value='';setTimeout(()=>{const badge=jobEl.querySelector('.new-badge');if(badge)badge.style.opacity='0'},3000)}
-if(addBtn)addBtn.addEventListener('click',addJob);
-if(urlInput)urlInput.addEventListener('keydown',e=>{if(e.key==='Enter')addJob()});
-
-// Waitlist form
+// Journey animation — syncs left text, clickable steps, starts on scroll
 (function(){
-  const emailInput = document.getElementById('waitlistEmail');
-  const btn = document.getElementById('waitlistBtn');
-  const msg = document.getElementById('waitlistMsg');
-  if (!emailInput || !btn || !msg) return;
+  const scenes=document.querySelectorAll('.j-scene'),jpSteps=document.querySelectorAll('.jp-step'),jpFill=document.getElementById('jpFill'),stepDescs=document.querySelectorAll('.step-desc');
+  if(!scenes.length)return;
+  let currentScene=0,isAnimating=false,journeyStarted=false,abortController=null;
+  const msgText="Hey Sarah — saw your team just shipped the new invoicing API. Really impressive work.\n\nI'm exploring PM roles and your team caught my eye. I led a similar billing migration at my last company (cut churn 23%).\n\nWould you be open to a 15-min chat?\n\nBest, Alex";
 
-  async function handleSubmit() {
-    const email = emailInput.value.trim();
-    if (!email) {
-      emailInput.focus();
-      return;
-    }
-    btn.disabled = true;
-    btn.textContent = 'Joining…';
-    msg.className = 'hero-note reveal stagger-3 visible';
-    msg.textContent = '';
-
-    try {
-      const res = await fetch('/api/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        msg.textContent = data.message || "You're on the list!";
-        msg.classList.add('success');
-        emailInput.value = '';
-        btn.textContent = 'You\'re in!';
-      } else if (res.status === 429) {
-        msg.textContent = 'Too many attempts. Please try again in a minute.';
-        msg.classList.add('error');
-        btn.textContent = 'Join the Waitlist →';
-        btn.disabled = false;
-      } else {
-        throw new Error(data.message || 'Something went wrong');
-      }
-    } catch (err) {
-      msg.textContent = err.message || 'Something went wrong. Please try again.';
-      msg.classList.add('error');
-      btn.textContent = 'Join the Waitlist →';
-      btn.disabled = false;
-    }
+  function showScene(i){
+    currentScene=i;
+    scenes.forEach(s=>s.classList.remove('active'));
+    jpSteps.forEach((s,j)=>{s.classList.remove('active','done');if(j<i)s.classList.add('done');if(j===i)s.classList.add('active')});
+    scenes[i].classList.add('active');
+    jpFill.style.width=((i/5)*100)+'%';
+    // Sync left description
+    stepDescs.forEach(d=>d.classList.remove('active'));
+    const desc=document.querySelector('.step-desc[data-step="'+i+'"]');
+    if(desc)desc.classList.add('active');
   }
 
-  btn.addEventListener('click', handleSubmit);
-  emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+  function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+  async function typeText(el,text,speed=30){el.innerHTML='';for(let i=0;i<text.length;i++){if(text[i]==='\n')el.innerHTML+='<br>';else el.innerHTML+=text[i];await sleep(speed)}}
+
+  async function runJourney(){
+    isAnimating=true;
+    showScene(0);await sleep(1500);document.getElementById('jCopyBtn').classList.add('clicked');document.getElementById('jCopiedToast').classList.add('show');await sleep(1200);document.getElementById('jCopyBtn').classList.remove('clicked');document.getElementById('jCopiedToast').classList.remove('show');
+    showScene(1);await sleep(600);const tu=document.getElementById('jTypingUrl');const url='linkedin.com/jobs/senior-pm-stripe';tu.innerHTML='<span class="j-typing-cursor"></span>';for(let i=0;i<url.length;i++){tu.innerHTML=url.substring(0,i+1)+'<span class="j-typing-cursor"></span>';await sleep(40)}document.getElementById('jDashAdd').classList.add('ready');await sleep(600);tu.innerHTML=url;document.getElementById('jDashCard').classList.add('show');await sleep(1800);
+    showScene(2);await sleep(500);document.getElementById('jc1').classList.add('show');await sleep(400);document.getElementById('jc2').classList.add('show');await sleep(400);document.getElementById('jc3').classList.add('show');await sleep(2000);
+    showScene(3);await sleep(400);await typeText(document.getElementById('jMsgBody'),msgText,18);await sleep(1200);
+    showScene(4);await sleep(600);document.getElementById('jt1').classList.add('show');await sleep(800);document.getElementById('jt2').classList.add('show');await sleep(800);document.getElementById('jt3').classList.add('show');await sleep(800);document.getElementById('jt4').classList.add('show');await sleep(2000);
+    showScene(5);await sleep(4000);
+    resetJourney();await sleep(800);isAnimating=false;runJourney();
+  }
+
+  function resetJourney(){document.getElementById('jCopyBtn').classList.remove('clicked');document.getElementById('jCopiedToast').classList.remove('show');document.getElementById('jTypingUrl').innerHTML='';document.getElementById('jDashAdd').classList.remove('ready');document.getElementById('jDashCard').classList.remove('show');['jc1','jc2','jc3'].forEach(id=>document.getElementById(id).classList.remove('show'));document.getElementById('jMsgBody').innerHTML='';['jt1','jt2','jt3','jt4'].forEach(id=>document.getElementById(id).classList.remove('show'))}
+
+  // Clickable steps
+  jpSteps.forEach(step=>{step.addEventListener('click',()=>{const idx=parseInt(step.dataset.s);resetJourney();showScene(idx);})});
+
+  const jObs=new IntersectionObserver(e=>{e.forEach(x=>{if(x.isIntersecting&&!journeyStarted){journeyStarted=true;setTimeout(runJourney,500)}})},{threshold:.3});
+  jObs.observe(document.getElementById('journeyBox'));
 })();
 </script>
 
