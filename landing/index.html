@@ -312,29 +312,159 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
 .footer-links a:hover { color: var(--white); }
 
 /* ========== RESPONSIVE ========== */
-@media(max-width:900px) {
+
+/* Tablet */
+@media (max-width: 900px) {
   .hero-grid { grid-template-columns: 1fr; gap: 48px; }
-  .hero-visual { height: 380px; }
+  .hero-visual { height: 320px; }
   .hero { padding: 120px 5vw 60px; }
-}
-@media (max-width: 768px) {
-  .pain-layout { grid-template-columns: 1fr; gap: 48px; }
-  .rejection-inbox { max-width: 100%; }
+  .hero-text { text-align: center; }
+  .hero-text .lead { margin-left: auto; margin-right: auto; }
+  .hero-form { margin: 0 auto; }
+  .hero-note { text-align: center; }
   .how-layout { grid-template-columns: 1fr; gap: 32px; }
+}
+
+/* Large phone / small tablet */
+@media (max-width: 768px) {
+  .pain-layout { grid-template-columns: 1fr; gap: 40px; }
+  .rejection-inbox { max-width: 100%; }
   .footer-bottom { flex-direction: column; gap: 16px; align-items: flex-start; }
   .footer-links { gap: 16px; }
-  .jp-steps { font-size: 8px; }
+  .jp-step { font-size: 8px; letter-spacing: 0.5px; }
   .journey-stage { min-height: 300px; }
+  .journey-progress { padding: 14px 16px 10px; }
+  .j-scene { padding: 16px; }
+  .j-msg-body { font-size: 12px; min-height: 80px; padding: 14px; }
+  .j-listing-title { font-size: 13px; }
+  .j-listing-company { font-size: 11px; }
+  .j-contact { padding: 10px 0; gap: 10px; }
+  .j-c-av { width: 32px; height: 32px; font-size: 10px; }
+  .j-c-name { font-size: 12px; }
+  .j-c-role { font-size: 10px; }
+  .j-c-tag { font-size: 8px; padding: 2px 6px; }
+  .pain-counter-num { font-size: clamp(3rem, 6vw, 4.5rem); }
 }
-@media(max-width:600px) {
-  .hero-form { flex-direction: column; }
-  .hero-form button { width: 100%; text-align: center; }
-  .hero-visual { display: none; }
+
+/* Phone */
+@media (max-width: 600px) {
+  /* Nav */
   .nav-links { display: none; }
-  .site-nav { padding: 8px 8px 8px 16px; }
+  .site-nav {
+    left: 16px; right: 16px; transform: none;
+    width: auto; padding: 8px 8px 8px 16px;
+    justify-content: space-between;
+  }
+
+  /* Cursor */
   .cursor-dot, .cursor-ring { display: none; }
   body { cursor: auto; }
   a, button, input { cursor: pointer; }
+
+  /* Hero */
+  .hero { padding: 100px 5vw 48px; min-height: auto; }
+  .hero-text h1 { font-size: clamp(2.2rem, 9vw, 3rem); }
+  .hero-form { flex-direction: column; max-width: 100%; }
+  .hero-form input { min-height: 52px; font-size: 1rem; padding: 14px 20px; }
+  .hero-form button { width: 100%; text-align: center; min-height: 52px; font-size: 1rem; }
+  .hero-text .lead { font-size: 0.95rem; }
+
+  /* Float cards — show 3 in a horizontal row instead of hiding */
+  .hero-visual {
+    display: flex !important;
+    flex-direction: row;
+    gap: 12px;
+    height: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding: 8px 0 16px;
+    scrollbar-width: none;
+  }
+  .hero-visual::-webkit-scrollbar { display: none; }
+  .float-card {
+    position: relative !important;
+    top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+    transform: none !important;
+    animation: none !important;
+    flex: 0 0 200px;
+    scroll-snap-align: start;
+    padding: 18px;
+  }
+  .float-card.dragging { transform: none !important; }
+  .fc-5 { display: none; }
+  .fc-4 { display: none; }
+  .fc-value { font-size: 1.3rem; }
+  .fc-sub { font-size: .72rem; }
+
+  /* Pain */
+  .pain { padding: clamp(56px, 8vw, 80px) 0; }
+  .pain-text h2 { font-size: clamp(2rem, 7vw, 2.8rem); }
+  .pain-counter { margin-top: 28px; }
+  .pain-counter-num { font-size: clamp(2.5rem, 10vw, 3.5rem); }
+  .rej-avatar { width: 30px; height: 30px; font-size: .58rem; }
+  .rej-email { padding: 12px; gap: 10px; }
+  .rej-sender { font-size: .75rem; }
+  .rej-subject { font-size: .72rem; }
+  .rej-preview { font-size: .66rem; }
+  .rej-badge { font-size: .52rem; padding: 1px 6px; }
+  .rej-time { font-size: .6rem; }
+  .inbox-list { max-height: 340px; padding: 6px; }
+
+  /* How it works */
+  .how { padding: clamp(56px, 8vw, 80px) 0; }
+  .how-header h2 { font-size: clamp(1.5rem, 5.5vw, 2rem); }
+  .journey-container { border-radius: 14px; }
+  .journey-stage { min-height: 280px; }
+  .jp-step { font-size: 7px; letter-spacing: 0.3px; }
+  .j-scene { padding: 14px; }
+  .j-browser-bar { padding: 8px 10px; gap: 8px; }
+  .j-url-bar { font-size: 10px; padding: 4px 8px; }
+  .j-browser-body { padding: 14px; }
+  .j-listing-logo { width: 32px; height: 32px; font-size: 13px; }
+  .j-listing-title { font-size: 12px; }
+  .j-listing-company { font-size: 10px; }
+  .j-copy-btn { font-size: 11px; padding: 6px 12px; }
+  .j-dash-url { padding: 8px 10px; gap: 8px; }
+  .j-typing-url { font-size: 10px; }
+  .j-msg-body { font-size: 11px; padding: 12px; min-height: 70px; line-height: 1.6; }
+  .j-msg-to { font-size: 11px; }
+  .j-msg-btn { font-size: 10px; padding: 5px 12px; }
+  .j-sent-title { font-size: 13px; }
+  .j-sent-check { width: 40px; height: 40px; font-size: 18px; }
+  .j-tl-item { font-size: 11px; }
+  .j-final-title { font-size: 18px; }
+  .j-final-role { font-size: 12px; }
+  .j-final-stats { gap: 16px; font-size: 11px; }
+  .j-final-stats strong { font-size: 16px; }
+  .j-final-cta { font-size: 11px; padding: 7px 16px; }
+  .step-desc h3 { font-size: 1.3rem; }
+  .step-desc p { font-size: .88rem; }
+
+  /* Footer */
+  .footer-giant-logo { font-size: clamp(3rem, 12vw, 5rem); }
+  .footer-zone { padding: clamp(32px, 5vw, 48px) 5vw 24px; }
+  .footer-links { gap: 12px; flex-wrap: wrap; }
+  .footer-links a { font-size: .72rem; }
+  .footer-copy { font-size: .7rem; }
+}
+
+/* Small phone */
+@media (max-width: 380px) {
+  .hero-text h1 { font-size: 2rem; }
+  .hero-text .lead { font-size: .88rem; }
+  .site-nav { top: 12px; left: 10px; right: 10px; }
+  .nav-brand { font-size: 1rem; }
+  .nav-cta { font-size: .78rem; padding: 7px 14px !important; }
+  .float-card { flex: 0 0 170px; padding: 14px; }
+  .fc-value { font-size: 1.1rem; }
+  .pain-text h2 { font-size: 1.8rem; }
+  .jp-step { font-size: 6px; }
+  .journey-stage { min-height: 260px; }
+  .j-scene { padding: 10px; }
+  .j-msg-body { font-size: 10px; }
+  .footer-giant-logo { font-size: 2.8rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
