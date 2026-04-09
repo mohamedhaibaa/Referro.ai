@@ -93,6 +93,11 @@ body:has(a:hover) .cursor-ring, body:has(button:hover) .cursor-ring, body:has(in
   backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid var(--ink-10); border-radius: 100px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.04);
+  transition: padding .4s var(--ease), box-shadow .4s var(--ease);
+}
+.site-nav.expanded {
+  padding: 10px 14px 10px 22px;
+  box-shadow: 0 6px 32px rgba(0,0,0,0.08);
 }
 .nav-brand { font-size: 1.1rem; font-weight: 700; color: var(--ink); text-decoration: none; padding-right: 12px; }
 .nav-brand i { color: var(--coral); font-style: italic; }
@@ -664,10 +669,11 @@ document.addEventListener('mouseenter',()=>{dot.style.opacity='1';ring.style.opa
 const revObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:.12,rootMargin:'0px 0px -60px 0px'});
 document.querySelectorAll('.reveal').forEach(el=>revObs.observe(el));
 
-// Show nav CTA only after scrolling past hero
+// Show nav CTA and expand nav after scrolling past hero
 const navCta=document.getElementById('navCta');
 const heroSection=document.getElementById('hero');
-if(navCta&&heroSection){const hObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){navCta.style.opacity='0';navCta.style.pointerEvents='none'}else{navCta.style.opacity='1';navCta.style.pointerEvents='auto'}})},{threshold:0.1});hObs.observe(heroSection)}
+const siteNav=document.querySelector('.site-nav');
+if(navCta&&heroSection&&siteNav){const hObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){navCta.style.opacity='0';navCta.style.pointerEvents='none';siteNav.classList.remove('expanded')}else{navCta.style.opacity='1';navCta.style.pointerEvents='auto';siteNav.classList.add('expanded')}})},{threshold:0.1});hObs.observe(heroSection)}
 
 // Zigzag draw
 const zigzagObs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('drawn')})},{threshold:.5});
