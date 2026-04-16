@@ -49,6 +49,25 @@ def _company_to_slug(company: str) -> str:
     return slug.strip("-")
 
 
+_STOP_WORDS = {
+    "and", "or", "the", "a", "an", "of", "in", "at", "for", "to", "with",
+    "on", "is", "be", "are", "was", "were", "by", "as", "it", "its",
+    "entry", "level", "senior", "junior", "lead", "associate", "staff",
+    "consultant", "specialist", "analyst", "officer", "head", "global",
+    "north", "south", "east", "west", "americas", "canada", "us", "usa",
+}
+
+def _extract_role_keywords(job_title: str) -> str:
+    """Extract meaningful keywords from a job title for LinkedIn employee search.
+
+    Strips seniority/level words and common filler words, returns the 3 most
+    meaningful terms joined by space (LinkedIn treats this as OR search).
+    """
+    words = re.findall(r"[a-zA-Z]+", job_title)
+    keywords = [w for w in words if w.lower() not in _STOP_WORDS and len(w) > 2]
+    return " ".join(keywords[:3]) if keywords else job_title
+
+
 def _extract_city(location: str | None) -> str:
     if not location:
         return ""
@@ -210,21 +229,32 @@ async def _process(payload: dict):
             logger.warning("No company_linkedin_url found — falling back to slug: %s", linkedin_company_url)
 
         city = _extract_city(job_location)
+        role_keywords = _extract_role_keywords(job_title)
+
+        # Build title keywords: role-relevant terms + always-present decision maker titles.
+        # titleKeywords uses strict matching — keep terms broad (single words or short phrases).
+        role_terms = [w for w in re.findall(r"[a-zA-Z]+", job_title)
+                      if w.lower() not in _STOP_WORDS and len(w) > 3][:3]
+        title_keywords = role_terms + ["Recruiter", "Talent Acquisition", "HR", "Manager", "Director"]
 
         run_input = {
             "companies": [linkedin_company_url],
             "profileScraperMode": "Full ($8 per 1k)",
-            "maxItems": 15,
+            "maxItems": 25,
+            "titleKeywords": title_keywords,
         }
         if city:
             run_input["locations"] = [city]
 
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=180.0) as client:
             profiles = await _apify_run(
                 client, "harvestapi~linkedin-company-employees", run_input,
             )
 
-        logger.info("Apify returned %d raw profiles for company %s", len(profiles), job_company)
+        logger.info(
+            "Apify returned %d profiles for company %s (titleKeywords: %s)",
+            len(profiles), job_company, title_keywords,
+        )
         if profiles:
             sample_keys = list(profiles[0].keys())
             logger.info("Sample profile top-level keys: %s", sample_keys)
@@ -295,7 +325,7 @@ async def _process(payload: dict):
                     items = await _apify_run(
                         client,
                         "apimaestro~linkedin-profile-posts",
-                        {"urls": [li_url], "maxPosts": 3},
+                        {"urls": [li_url], "limit": 3},
                     )
                     posts_map[li_url] = [
                         item.get("text", "") for item in items if item.get("text")

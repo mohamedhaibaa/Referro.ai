@@ -7,6 +7,7 @@ from app.consumers import (
     follow_up_generation,
     flash_card_generation,
     pitch_deck_generation,
+    cleanup,
 )
 
 logging.basicConfig(level="INFO")
@@ -22,6 +23,7 @@ async def main():
         follow_up_generation.listen(),
         flash_card_generation.listen(),
         pitch_deck_generation.listen(),
+        cleanup.run_cleanup(),
     )
 
 

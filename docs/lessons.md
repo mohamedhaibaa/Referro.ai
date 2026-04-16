@@ -62,6 +62,13 @@ We initially had `confidence` (High/Medium/Low) as part of the Contact type on t
 
 ---
 
+### Always read third-party API docs before writing integration code
+We used `maxPosts` (wrong), then `maxResults` (also wrong), before finding the correct parameter `limit` for the `apimaestro/linkedin-profile-posts` actor. Similarly used `searchKeywords` (wrong) before finding `titleKeywords` for `harvestapi/linkedin-company-employees`. Both wrong parameters were silently ignored, causing 100-result runs at $0.50 each instead of 3-result runs at $0.02.
+
+**Rule:** Before writing any code that calls an external API or Apify actor, fetch the actor's Input tab or README to get exact parameter names. Never guess or infer from similar APIs.
+
+---
+
 ### Non-LinkedIn pages embed unrelated LinkedIn URLs
 When scraping a non-LinkedIn job page to extract the company's LinkedIn URL, you will find LinkedIn links from unrelated companies in the page footer, header, or embedded widgets. Only trust LinkedIn company URL extraction from LinkedIn's own job pages. For other sites, scrape the company's own homepage footer or use an API lookup with domain validation.
 

@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.db.models.job import Job, JobMilestone
+from app.db.models.job import Job, JobMilestone, Contact
 from app.db.models.user import User
 from app.api.deps import get_current_user
 from app.services import queue
@@ -163,6 +163,13 @@ def update_job(
             job.due_date = date.fromisoformat(value)
         else:
             setattr(job, field, value)
+
+    if body.status in ("Interviewing", "Closed"):
+        db.query(Contact).filter(
+            Contact.job_id == job.id,
+            Contact.user_id == current_user.id,
+            Contact.profile_data.isnot(None),
+        ).update({"profile_data": None}, synchronize_session=False)
 
     db.commit()
     db.refresh(job)
