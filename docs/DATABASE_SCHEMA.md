@@ -55,9 +55,12 @@ Core entity. One row per job the user is tracking. Maps directly to a Kanban car
 | `user_id` | UUID | FK → users.id, NOT NULL | Owner |
 | `title` | VARCHAR(255) | NOT NULL | e.g. "Senior Product Manager" |
 | `company` | VARCHAR(255) | NOT NULL | e.g. "Google" |
-| `company_logo_url` | TEXT | NULLABLE | Auto-fetched or user-uploaded |
+| `company_logo_url` | TEXT | NULLABLE | ⏳ Planned — not yet implemented, always NULL |
+| `company_linkedin_url` | TEXT | NULLABLE | Extracted from job page HTML during parsing; used by contact discovery to scrape the correct company |
 | `url` | TEXT | NOT NULL | Original job posting URL (LinkedIn etc.) |
 | `description` | TEXT | NULLABLE | Parsed from job posting or user-entered |
+| `company_research` | TEXT | NULLABLE | AI-generated company summary (JSON string) set by REF-11 job parsing |
+| `location` | VARCHAR(255) | NULLABLE | City/region parsed from job posting; used for contact city-match scoring |
 | `status` | VARCHAR(50) | NOT NULL, default 'Interested' | See `JobStatus` enum below |
 | `fit_score` | VARCHAR(10) | NULLABLE | 'High', 'Medium', 'Low', or NULL |
 | `work_mode` | VARCHAR(20) | NULLABLE | 'Remote', 'Hybrid', 'On-site' |
@@ -110,28 +113,39 @@ One row per job. Tracks the 10 boolean milestones shown in the ProgressTracker c
 
 ### 4. `contacts`
 
-People discovered (by AI or manually) for a specific job. Shown in the ContactDiscovery component.
+People discovered by the AI contact discovery pipeline for a specific job. Shown in the ContactDiscovery component. Up to 5 contacts per job, ranked by AI relevance score.
 
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | `id` | UUID | PK, default gen_random_uuid() | |
 | `job_id` | UUID | FK → jobs.id, NOT NULL | Which job this contact is for |
 | `user_id` | UUID | FK → users.id, NOT NULL | For RLS |
-| `name` | VARCHAR(255) | NOT NULL | e.g. "Sarah Chen" |
-| `title` | VARCHAR(255) | NOT NULL | e.g. "Senior Recruiter" |
-| `relationship` | VARCHAR(50) | NOT NULL | 'Recruiter', 'Hiring Manager', 'Team Lead', 'Employee' |
-| `confidence` | VARCHAR(10) | NOT NULL | 'High', 'Medium', 'Low' |
-| `source` | VARCHAR(100) | NOT NULL | e.g. "LinkedIn", "Company website" |
-| `profile_url` | TEXT | NULLABLE | LinkedIn profile URL |
-| `is_selected` | BOOLEAN | NOT NULL, default false | User chose this contact for outreach |
+| `full_name` | VARCHAR(255) | NULLABLE | e.g. "Sarah Chen" |
+| `linkedin_url` | TEXT | NULLABLE | LinkedIn profile URL |
+| `title` | VARCHAR(255) | NULLABLE | e.g. "Senior Recruiter at IBM" |
+| `company` | VARCHAR(255) | NULLABLE | Company name from their LinkedIn profile |
+| `location` | VARCHAR(255) | NULLABLE | City/region from LinkedIn profile |
+| `university` | VARCHAR(255) | NULLABLE | Most recent university from LinkedIn education |
+| `tenure_months` | INTEGER | NULLABLE | Months at current company; used in AI scoring |
+| `relevance_score` | INTEGER | NULLABLE | 0-100 AI score; used to rank contacts and compute confidence |
+| `profile_data` | TEXT | NULLABLE | Full Apify profile JSON + recent posts; used for outreach/coffee chat prep. Nullified after 30 days or when job reaches "Interviewing"/"Closed" — see cleanup policy below |
 | `created_at` | TIMESTAMPTZ | NOT NULL, default now() | |
+
+**Computed in API (not stored):**
+- `confidence` — "High" (≥60), "Medium" (≥35), "Low" (<35) derived from `relevance_score`
+- `relationship` — "Recruiter", "Hiring Manager", "Team Lead", or "Employee" inferred from `title` keywords
+- `source` — always "LinkedIn" for AI-discovered contacts
 
 **Indexes**:
 - `contacts_job_id_idx` on `job_id`
 - `contacts_user_id_idx` on `user_id`
 
 **RLS**: Users can only access contacts for their own jobs.
-**Side effect**: When `is_selected` is set to true → set `job_milestones.contact_selected = true` and update `jobs.status` to 'Outreach Ready' if currently 'Interested'.
+
+**Cleanup policy (REF-13):**
+- `profile_data` is nullified (set to NULL) when job status changes to "Interviewing" or "Closed"
+- `profile_data` is also nullified by a daily background cleanup job after 30 days from `created_at`
+- The contact row itself is never deleted by cleanup — only the raw profile blob is cleared
 
 ---
 
@@ -387,6 +401,11 @@ Tracks async AI jobs (contact discovery, outreach generation, pitch deck, flash 
 
 **RLS**: Users can only access their own workflow runs.
 
+**Cleanup policy (REF-13):**
+- Rows with `status != 'failed'` are deleted after 30 days
+- Rows with `status = 'failed'` are deleted after 90 days (kept longer for debugging)
+- All output is saved to its own table before deletion (contacts, outreach_messages, etc.)
+
 ---
 
 ## Computed / Derived Data (Not Stored)
@@ -462,4 +481,4 @@ Tables must be created in this order to satisfy foreign key dependencies:
 
 ---
 
-*Last updated: 2026-02-27*
+*Last updated: 2026-04-10 — REF-12 (contact discovery columns), REF-13 (cleanup policies)*

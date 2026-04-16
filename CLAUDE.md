@@ -149,6 +149,14 @@ Queue names are **kebab-case** and **case-sensitive**. Must match exactly betwee
 
 ---
 
+## Third-Party Tool Integrations
+
+**Before connecting any external tool/API/actor, always read its documentation first to get the exact parameter names. Never assume or make up parameter names — use only what the docs confirm.**
+
+Examples of what went wrong: `maxPosts` (wrong) → `maxResults`; `searchKeywords` (wrong) → `titleKeywords`. Both were silently ignored, causing incorrect behavior.
+
+---
+
 ## What NOT To Do
 
 - Don't use cookies for auth — JWT in Authorization header only
@@ -174,6 +182,16 @@ Queue names are **kebab-case** and **case-sensitive**. Must match exactly betwee
 - Always log raw AI responses before `json.loads()` — strip markdown fences before parsing
 - Delete stale records before inserting new ones (e.g. contacts) to prevent duplicates on re-runs
 - Use `python3.12` explicitly when creating venvs — `python3` defaults to 3.9 on this machine
+
+---
+
+## End-of-Ticket Documentation (Required)
+
+At the end of every ticket, before committing:
+1. Scan all files in `docs/` to check if the work relates to an existing doc (e.g. `DATABASE_SCHEMA.md`, `WORKFLOW_LIFECYCLE.md`)
+2. If a related file exists — update it
+3. If no related file exists — create a new file in `docs/` or `docs/learnings/` describing what was built, how it works, and key decisions
+4. Commit the docs alongside the code in the same commit
 
 ---
 
