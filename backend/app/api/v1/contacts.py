@@ -1,13 +1,22 @@
 import uuid
+from decimal import Decimal
 from fastapi import APIRouter, status, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models.job import Job, Contact
 from app.db.models.user import User
+from app.db.models.credit import CreditTransaction, CAMPAIGN, REVISIT
 from app.api.deps import get_current_user
 from app.services import queue
 
 router = APIRouter()
+
+
+class DiscoverRequest(BaseModel):
+    batch_number: int = 1
+    round_number: int = 1
 
 
 def _infer_relationship(title: str | None) -> str:
@@ -45,8 +54,22 @@ def _contact_to_dict(c: Contact) -> dict:
         "confidence": _infer_confidence(c.relevance_score),
         "relationship": _infer_relationship(c.title),
         "source": "LinkedIn",
+        "batchNumber": c.batch_number,
+        "roundNumber": c.round_number,
         "createdAt": c.created_at.isoformat(),
     }
+
+
+def _deduct_credits(user: User, amount: Decimal, transaction_type: str, job_id: uuid.UUID, db: Session):
+    if user.credits_remaining < amount:
+        raise HTTPException(status_code=402, detail="Insufficient credits")
+    user.credits_remaining -= amount
+    db.add(CreditTransaction(
+        user_id=user.id,
+        job_id=job_id,
+        amount=-amount,
+        transaction_type=transaction_type,
+    ))
 
 
 @router.get("/{job_id}/contacts")
@@ -66,13 +89,125 @@ def list_contacts(
     contacts = (
         db.query(Contact)
         .filter(Contact.job_id == uuid.UUID(job_id), Contact.user_id == current_user.id)
-        .order_by(Contact.relevance_score.desc())
+        .order_by(Contact.round_number, Contact.batch_number, Contact.relevance_score.desc())
         .all()
     )
 
     return {
         "data": [_contact_to_dict(c) for c in contacts],
         "meta": {"count": len(contacts)},
+        "error": None,
+    }
+
+
+@router.post("/{job_id}/contacts/discover")
+def discover_contacts(
+    job_id: str,
+    body: DiscoverRequest = DiscoverRequest(),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job_uuid = uuid.UUID(job_id)
+    job = (
+        db.query(Job)
+        .filter(Job.id == job_uuid, Job.user_id == current_user.id, Job.is_deleted == False)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Batches 2 and 3: serve from DB instantly, no Apify call, no credit charge
+    if body.batch_number in (2, 3):
+        contacts = (
+            db.query(Contact)
+            .filter(
+                Contact.job_id == job_uuid,
+                Contact.user_id == current_user.id,
+                Contact.batch_number == body.batch_number,
+                Contact.round_number == body.round_number,
+            )
+            .order_by(Contact.relevance_score.desc())
+            .all()
+        )
+        batch3_exists = (
+            db.query(Contact)
+            .filter(
+                Contact.job_id == job_uuid,
+                Contact.user_id == current_user.id,
+                Contact.batch_number == 3,
+                Contact.round_number == body.round_number,
+            )
+            .count() > 0
+        )
+        has_more = body.batch_number == 2 and batch3_exists
+        return {
+            "data": {
+                "contacts": [_contact_to_dict(c) for c in contacts],
+                "batchNumber": body.batch_number,
+                "hasMore": has_more,
+            },
+            "meta": {},
+            "error": None,
+        }
+
+    # Batch 1: credit check + deduct + publish to worker
+    _deduct_credits(current_user, Decimal("1.0"), CAMPAIGN, job_uuid, db)
+    wf = queue.publish_contact_discovery(
+        db, current_user.id, job_uuid,
+        batch_number=1,
+        round_number=body.round_number,
+    )
+    db.commit()
+
+    return {
+        "data": {
+            "workflowRunId": str(wf.id),
+            "batchNumber": 1,
+            "hasMore": True,
+        },
+        "meta": {},
+        "error": None,
+    }
+
+
+@router.post("/{job_id}/contacts/revisit", status_code=status.HTTP_202_ACCEPTED)
+def revisit_contacts(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job_uuid = uuid.UUID(job_id)
+    job = (
+        db.query(Job)
+        .filter(Job.id == job_uuid, Job.user_id == current_user.id, Job.is_deleted == False)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Determine the next round number
+    max_round = db.query(func.max(Contact.round_number)).filter(
+        Contact.job_id == job_uuid,
+        Contact.user_id == current_user.id,
+    ).scalar() or 0
+    new_round = max_round + 1
+
+    _deduct_credits(current_user, Decimal("0.5"), REVISIT, job_uuid, db)
+    wf = queue.publish_contact_discovery(
+        db, current_user.id, job_uuid,
+        batch_number=1,
+        round_number=new_round,
+    )
+    db.commit()
+
+    return {
+        "data": {
+            "workflowRunId": str(wf.id),
+            "roundNumber": new_round,
+            "batchNumber": 1,
+            "hasMore": True,
+        },
+        "meta": {},
         "error": None,
     }
 
@@ -92,26 +227,3 @@ def delete_contacts(
         raise HTTPException(status_code=404, detail="Job not found")
     db.query(Contact).filter(Contact.job_id == uuid.UUID(job_id), Contact.user_id == current_user.id).delete()
     db.commit()
-
-
-@router.post("/{job_id}/contacts/discover", status_code=status.HTTP_202_ACCEPTED)
-def discover_contacts(
-    job_id: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    job = (
-        db.query(Job)
-        .filter(Job.id == uuid.UUID(job_id), Job.user_id == current_user.id, Job.is_deleted == False)
-        .first()
-    )
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    wf = queue.publish_contact_discovery(db, current_user.id, job.id)
-
-    return {
-        "data": {"workflowRunId": str(wf.id)},
-        "meta": {},
-        "error": None,
-    }

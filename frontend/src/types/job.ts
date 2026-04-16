@@ -63,7 +63,15 @@ export interface Contact {
   relationship: "Recruiter" | "Hiring Manager" | "Team Lead" | "Employee";
   confidence: "High" | "Medium" | "Low";
   source: string;
+  batchNumber?: number;
+  roundNumber?: number;
   createdAt?: string;
+}
+
+export interface UserCredits {
+  creditsRemaining: number;
+  creditsTotal: number;
+  planTier: string;
 }
 
 export interface OutreachMessage {

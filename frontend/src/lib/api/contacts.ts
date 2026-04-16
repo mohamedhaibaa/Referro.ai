@@ -8,7 +8,23 @@ interface ContactsResponse {
 }
 
 interface DiscoverResponse {
-  data: { workflowRunId: string };
+  data: {
+    workflowRunId?: string;
+    contacts?: Contact[];
+    batchNumber: number;
+    hasMore: boolean;
+  };
+  meta: Record<string, unknown>;
+  error: string | null;
+}
+
+interface RevisitResponse {
+  data: {
+    workflowRunId: string;
+    roundNumber: number;
+    batchNumber: number;
+    hasMore: boolean;
+  };
   meta: Record<string, unknown>;
   error: string | null;
 }
@@ -18,7 +34,21 @@ export async function getContacts(jobId: string): Promise<Contact[]> {
   return res.data;
 }
 
-export async function discoverContacts(jobId: string): Promise<string> {
-  const res = await api.post<DiscoverResponse>(`/jobs/${jobId}/contacts/discover`);
-  return res.data.workflowRunId;
+export async function discoverContacts(
+  jobId: string,
+  batchNumber: number = 1,
+  roundNumber: number = 1
+): Promise<{ workflowRunId?: string; contacts?: Contact[]; batchNumber: number; hasMore: boolean }> {
+  const res = await api.post<DiscoverResponse>(`/jobs/${jobId}/contacts/discover`, {
+    batch_number: batchNumber,
+    round_number: roundNumber,
+  });
+  return res.data;
+}
+
+export async function revisitContacts(
+  jobId: string
+): Promise<{ workflowRunId: string; roundNumber: number; batchNumber: number; hasMore: boolean }> {
+  const res = await api.post<RevisitResponse>(`/jobs/${jobId}/contacts/revisit`, {});
+  return res.data;
 }

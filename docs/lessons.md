@@ -4,6 +4,25 @@ Running log of patterns discovered, mistakes made, and rules for future sessions
 
 ---
 
+## REF-PRICING: Cost Optimization (April 2026)
+
+### Posts scraper removed from v1 — do not re-add without explicit product decision
+`apimaestro/linkedin-profile-posts` was removed because it cost $0.10 per discovery run. Education + experience data from the employee scraper is sufficient for outreach personalization. Posts may return as a Closer-tier premium feature in v2. Do not re-add without a product decision and cost analysis.
+
+### Contact discovery uses a single Apify call, not per-batch calls
+All 12 profiles are fetched in one Apify call on batch 1. Batches 2 and 3 are served from DB with no Apify call. This is cheaper and avoids pagination issues with `harvestapi~linkedin-company-employees`. Do not change this to per-batch Apify calls without verifying the actor supports reliable offset pagination.
+
+### Credits are tracked server-side, never trust frontend credit count
+The frontend displays `credits_remaining` from `GET /credits/me` for UX only. All credit checks and deductions happen in the backend API. Never skip the server-side credit check based on a frontend value.
+
+### Revisit action must de-duplicate against existing contacts for the same job_id
+When `round_number > 1`, the worker checks existing `linkedin_url` values for that job before inserting. Without this, the same people would appear in every revisit round.
+
+### Credit deduction happens before queue publish — no automatic refund on failure
+If the Service Bus publish fails after credits are deducted, the credit is spent with no discovery run. This is a known v1 limitation. Future: add credit refund on WorkflowRun status='failed' (set by queue.py publish failure handler).
+
+---
+
 ## REF-12: Contact Discovery (April 2026)
 
 ### Always log the raw API response before parsing it

@@ -1,8 +1,10 @@
-import { Home, Inbox, Briefcase, FileText, Settings, LogOut, Headphones } from "lucide-react";
+import { Home, Inbox, Briefcase, FileText, Settings, LogOut, Headphones, Zap } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useCredits } from "@/hooks/useCredits";
 
 const Sidebar = () => {
   const location = useLocation();
+  const { data: credits } = useCredits();
   
   const navItems = [
     { icon: Home, label: "Home", to: "/" },
@@ -52,7 +54,20 @@ const Sidebar = () => {
             <item.icon size={22} strokeWidth={isActive(item.to) ? 2 : 1.5} />
           </Link>
         ))}
-        <button className="w-12 h-12 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-all mt-4" title="Log out">
+        {credits !== undefined && (
+          <div
+            className="w-12 flex flex-col items-center justify-center py-1.5 rounded-xl bg-muted/50 cursor-default"
+            title={`${credits.creditsRemaining} credits remaining (${credits.planTier})`}
+          >
+            <Zap size={14} className="text-primary mb-0.5" />
+            <span className="text-[11px] font-semibold text-foreground leading-none">
+              {credits.creditsRemaining % 1 === 0
+                ? credits.creditsRemaining.toFixed(0)
+                : credits.creditsRemaining.toFixed(1)}
+            </span>
+          </div>
+        )}
+        <button className="w-12 h-12 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-all mt-2" title="Log out">
           <LogOut size={22} strokeWidth={1.5} />
         </button>
       </div>

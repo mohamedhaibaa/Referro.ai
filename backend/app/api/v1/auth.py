@@ -1,8 +1,10 @@
+from decimal import Decimal
 from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models.user import User
+from app.db.models.credit import CreditTransaction, PLAN_GRANT
 from app.core.security import hash_password, verify_password, create_access_token
 
 router = APIRouter()
@@ -31,6 +33,17 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         name=body.name,
     )
     db.add(user)
+    db.flush()  # get user.id before commit
+
+    user.credits_remaining = Decimal("3.0")
+    user.credits_total = Decimal("3.0")
+    user.plan_tier = "trial"
+    db.add(CreditTransaction(
+        user_id=user.id,
+        job_id=None,
+        amount=Decimal("3.0"),
+        transaction_type=PLAN_GRANT,
+    ))
     db.commit()
     db.refresh(user)
 
@@ -39,7 +52,13 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         "data": {
             "access_token": token,
             "token_type": "bearer",
-            "user": {"id": str(user.id), "email": user.email, "name": user.name},
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "creditsRemaining": float(user.credits_remaining),
+                "planTier": user.plan_tier,
+            },
         },
         "error": None,
     }
@@ -56,7 +75,13 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
         "data": {
             "access_token": token,
             "token_type": "bearer",
-            "user": {"id": str(user.id), "email": user.email, "name": user.name},
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "creditsRemaining": float(user.credits_remaining),
+                "planTier": user.plan_tier,
+            },
         },
         "error": None,
     }

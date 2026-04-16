@@ -176,6 +176,8 @@ async def _process(payload: dict):
     wf_id = payload["workflow_run_id"]
     job_id = uuid.UUID(payload["job_id"])
     user_id = uuid.UUID(payload["user_id"])
+    batch_number = int(payload.get("batch_number", 1))
+    round_number = int(payload.get("round_number", 1))
 
     def now():
         return datetime.now(timezone.utc)
@@ -187,6 +189,27 @@ async def _process(payload: dict):
             text("UPDATE workflow_runs SET status='running', started_at=:t WHERE id=:id"),
             {"t": now(), "id": wf_id},
         )
+
+        # Idempotency: skip if contacts already exist for this batch + round
+        already_saved = db.execute(
+            text("""
+                SELECT COUNT(*) FROM contacts
+                WHERE job_id = :job_id AND user_id = :user_id
+                  AND batch_number = :batch_number AND round_number = :round_number
+            """),
+            {"job_id": job_id, "user_id": user_id, "batch_number": batch_number, "round_number": round_number},
+        ).scalar()
+        if already_saved:
+            logger.info(
+                "Idempotency: contacts already exist for batch=%d round=%d — skipping Apify call",
+                batch_number, round_number,
+            )
+            db.execute(
+                text("UPDATE workflow_runs SET status='completed', completed_at=:t, output_data=:out WHERE id=:id"),
+                {"t": now(), "out": json.dumps({"contacts_saved": 0, "skipped": True}), "id": wf_id},
+            )
+            db.commit()
+            return
 
         job = db.execute(
             text("SELECT title, company, location, company_linkedin_url FROM jobs WHERE id = :job_id"),
@@ -237,12 +260,15 @@ async def _process(payload: dict):
                       if w.lower() not in _STOP_WORDS and len(w) > 3][:3]
         title_keywords = role_terms + ["Recruiter", "Talent Acquisition", "HR", "Manager", "Director"]
 
+        start_page = (round_number - 1) * 3 + batch_number
         run_input = {
             "companies": [linkedin_company_url],
             "profileScraperMode": "Full ($8 per 1k)",
-            "maxItems": 25,
+            "maxItems": 4,
+            "startPage": start_page,
             "titleKeywords": title_keywords,
         }
+        logger.info("Apify startPage=%d (batch=%d round=%d)", start_page, batch_number, round_number)
         if city:
             run_input["locations"] = [city]
 
@@ -308,40 +334,23 @@ async def _process(payload: dict):
             key=lambda p: score_map.get(p.get("linkedinUrl", ""), 0),
             reverse=True,
         )
-        top5 = active_profiles[:5]
+        top3 = active_profiles[:3]
         logger.info(
-            "Top 5 contacts selected: %s",
-            [(p.get("linkedinUrl", ""), score_map.get(p.get("linkedinUrl", ""), 0)) for p in top5],
+            "Top contacts for batch %d: %s",
+            batch_number,
+            [(p.get("linkedinUrl", ""), score_map.get(p.get("linkedinUrl", ""), 0)) for p in top3],
         )
 
-        # --- Step 3: Apify Profile Posts ---
-        posts_map = {}
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            for profile in top5:
-                li_url = profile.get("linkedinUrl", "")
-                if not li_url:
-                    continue
-                try:
-                    items = await _apify_run(
-                        client,
-                        "apimaestro~linkedin-profile-posts",
-                        {"urls": [li_url], "limit": 3},
-                    )
-                    posts_map[li_url] = [
-                        item.get("text", "") for item in items if item.get("text")
-                    ]
-                except Exception as exc:
-                    logger.warning("Failed to fetch posts for %s: %s", li_url, exc)
-                    posts_map[li_url] = []
+        # --- Step 3: Save to DB ---
+        # Batch 1 round 1: clear all existing contacts for a fresh campaign start
+        if batch_number == 1 and round_number == 1:
+            db.execute(
+                text("DELETE FROM contacts WHERE job_id = :job_id AND user_id = :user_id"),
+                {"job_id": job_id, "user_id": user_id},
+            )
 
-        # --- Step 4: Save to DB ---
-        # Clear any previously discovered contacts for this job before saving new ones
-        db.execute(
-            text("DELETE FROM contacts WHERE job_id = :job_id AND user_id = :user_id"),
-            {"job_id": job_id, "user_id": user_id},
-        )
-        logger.info("Saving %d contacts to DB for job_id=%s", len(top5), job_id)
-        for i, profile in enumerate(top5):
+        logger.info("Saving %d contacts to DB for job_id=%s (batch=%d round=%d)", len(top3), job_id, batch_number, round_number)
+        for i, profile in enumerate(top3):
             li_url = profile.get("linkedinUrl", "")
             pos = _current_position(profile)
             first = profile.get("firstName", "") or ""
@@ -360,36 +369,37 @@ async def _process(payload: dict):
                 "university": _extract_university(profile),
                 "tenure_months": _tenure_months(profile.get("tenureAtCompany"), profile.get("experience")),
                 "relevance_score": score_map.get(li_url, 0),
+                "batch_number": batch_number,
+                "round_number": round_number,
                 "t": now(),
             }
             logger.info(
-                "Inserting contact %d/%d: full_name=%r linkedin_url=%r title=%r score=%s",
-                i + 1, len(top5),
+                "Inserting contact %d/%d: full_name=%r title=%r score=%s batch=%d round=%d",
+                i + 1, len(top3),
                 contact_params["full_name"],
-                contact_params["linkedin_url"],
                 contact_params["title"],
                 contact_params["relevance_score"],
+                contact_params["batch_number"],
+                contact_params["round_number"],
             )
-
-            profile_with_posts = {**profile, "recent_posts": posts_map.get(li_url, [])}
 
             db.execute(
                 text("""
                     INSERT INTO contacts
                         (id, job_id, user_id, full_name, linkedin_url, title,
                          company, location, university, tenure_months,
-                         relevance_score, profile_data, created_at)
+                         relevance_score, profile_data, batch_number, round_number, created_at)
                     VALUES
                         (:id, :job_id, :user_id, :full_name, :linkedin_url, :title,
                          :company, :location, :university, :tenure_months,
-                         :relevance_score, :profile_data, :t)
+                         :relevance_score, :profile_data, :batch_number, :round_number, :t)
                 """),
-                {**contact_params, "profile_data": json.dumps(profile_with_posts)},
+                {**contact_params, "profile_data": json.dumps(profile)},
             )
-            logger.info("Contact %d/%d inserted successfully: %r", i + 1, len(top5), full_name)
+            logger.info("Contact %d/%d inserted successfully: %r", i + 1, len(top3), full_name)
 
         db.commit()
-        logger.info("Committed %d contacts to DB", len(top5))
+        logger.info("Committed %d contacts to DB (batch=%d round=%d)", len(top3), batch_number, round_number)
 
         # --- Step 5: Cleanup ---
         try:
@@ -410,7 +420,7 @@ async def _process(payload: dict):
             """),
             {
                 "t": now(),
-                "out": json.dumps({"contacts_saved": len(top5)}),
+                "out": json.dumps({"contacts_saved": len(top3), "batch_number": batch_number, "round_number": round_number}),
                 "id": wf_id,
             },
         )

@@ -175,6 +175,17 @@ Examples of what went wrong: `maxPosts` (wrong) → `maxResults`; `searchKeyword
 - Don't store display-layer fields (confidence, relationship labels) in the DB — compute them in the API serializer
 - Don't forget to renew Service Bus message locks in long-running workers (use `_renew_lock_periodically`)
 
+## Contact Discovery — Pricing Architecture
+
+- **Batches:** 12 profiles scraped in ONE Apify call on batch 1. Top 9 scored and saved with batch_number (1/2/3) by rank. Batches 2+3 served from DB instantly — no Apify call.
+- **Credits:** 1 credit = 1 campaign (all 3 batches included). Revisit = 0.5 credit. Check `credits_remaining` before any discovery call. Deduct at API layer, not in the worker.
+- **Revisit:** New round_number assigned. De-duplicates by linkedin_url against existing contacts for that job.
+- **Posts scraper (`apimaestro/linkedin-profile-posts`) is DISABLED in v1.** Do not call this actor without a product decision.
+- **Pricing tiers:** trial (3 credits), warmup (20), grind (60), closer (200 fair-use + free revisits)
+- **Credit check returns 402** — frontend shows inline error message.
+
+---
+
 ## Worker Patterns
 
 - Every new consumer must follow: `queued → running → completed/failed` lifecycle

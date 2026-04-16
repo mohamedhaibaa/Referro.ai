@@ -53,10 +53,21 @@ def publish_job_parsing(db: Session, user_id: uuid.UUID, job_id: uuid.UUID, url:
     )
 
 
-def publish_contact_discovery(db: Session, user_id: uuid.UUID, job_id: uuid.UUID) -> WorkflowRun:
+def publish_contact_discovery(
+    db: Session,
+    user_id: uuid.UUID,
+    job_id: uuid.UUID,
+    batch_number: int = 1,
+    round_number: int = 1,
+) -> WorkflowRun:
     return _publish(
         queue_name="contact-discovery",
-        payload={"user_id": str(user_id), "job_id": str(job_id)},
+        payload={
+            "user_id": str(user_id),
+            "job_id": str(job_id),
+            "batch_number": batch_number,
+            "round_number": round_number,
+        },
         db=db,
         user_id=user_id,
         job_id=job_id,

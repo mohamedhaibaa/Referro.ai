@@ -77,11 +77,14 @@ class Contact(Base):
     tenure_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     relevance_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     profile_data: Mapped[str | None] = mapped_column(Text, nullable=True)
+    batch_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     __table_args__ = (
         Index("contacts_job_id_idx", "job_id"),
         Index("contacts_user_id_idx", "user_id"),
+        Index("contacts_job_batch_idx", "job_id", "batch_number", "round_number"),
     )
 
 
