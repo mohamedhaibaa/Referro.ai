@@ -93,6 +93,8 @@ def _contact_to_dict(c: Contact) -> dict:
         "batchNumber": c.batch_number,
         "roundNumber": c.round_number,
         "isSelected": c.is_selected,
+        "lifecycleStatus": c.lifecycle_status,
+        "repliedAt": c.replied_at.isoformat() if c.replied_at else None,
         "createdAt": c.created_at.isoformat(),
     }
 
@@ -219,6 +221,7 @@ def revisit_contacts(
 
 class PatchContactRequest(BaseModel):
     is_selected: Optional[bool] = None
+    replied_at: Optional[str] = None  # ISO-8601 to set, explicit None to clear
 
 
 @router.patch("/{job_id}/contacts/{contact_id}")
@@ -229,6 +232,9 @@ def update_contact(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    from datetime import datetime
+    from app.api.v1.outreach import _recompute_and_persist
+
     job_uuid = uuid.UUID(job_id)
     contact = (
         db.query(Contact)
@@ -256,6 +262,17 @@ def update_contact(
 
     if body.is_selected is not None:
         contact.is_selected = body.is_selected
+
+    fields = body.model_dump(exclude_unset=True)
+    if "replied_at" in fields:
+        if body.replied_at is None:
+            contact.replied_at = None
+        else:
+            try:
+                contact.replied_at = datetime.fromisoformat(body.replied_at.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="replied_at must be ISO-8601")
+        _recompute_and_persist(contact, db)
 
     db.commit()
     db.refresh(contact)

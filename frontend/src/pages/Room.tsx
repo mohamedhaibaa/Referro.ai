@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import PickContactsPanel from "@/components/room/PickContactsPanel";
+import Phase2Panel from "@/components/room/Phase2Panel";
 import { useJob, useJobMilestones, useUpdateMilestones } from "@/hooks/useJobs";
 import { getStagePill, TONE_CLASSES } from "@/lib/jobStagePill";
 
@@ -69,12 +70,7 @@ const Room = () => {
       </div>
 
       {isPhase2 ? (
-        <div className="rounded-2xl border border-dashed border-border p-10 text-center">
-          <p className="text-lg text-foreground mb-1">Phase 2 — coming soon</p>
-          <p className="text-sm text-muted-foreground">
-            Your 3 contacts are locked in. Outreach drafting lives here next.
-          </p>
-        </div>
+        <Phase2Panel job={job} />
       ) : (
         <PickContactsPanel
           jobId={jobId}

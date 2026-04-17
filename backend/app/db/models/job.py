@@ -80,6 +80,8 @@ class Contact(Base):
     batch_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_selected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    lifecycle_status: Mapped[str] = mapped_column(String(40), nullable=False, default="not_contacted")
+    replied_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     __table_args__ = (

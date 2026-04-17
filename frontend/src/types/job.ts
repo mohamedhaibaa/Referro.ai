@@ -68,6 +68,8 @@ export interface Contact {
   batchNumber?: number;
   roundNumber?: number;
   isSelected?: boolean;
+  lifecycleStatus?: string;
+  repliedAt?: string | null;
   createdAt?: string;
 }
 
@@ -77,11 +79,17 @@ export interface UserCredits {
   planTier: string;
 }
 
+export type OutreachType = "initial" | "followup_1" | "followup_2";
+
 export interface OutreachMessage {
   id: string;
+  jobId?: string;
+  contactId?: string;
   message: string;
-  sentAt?: string;
-  type: "initial" | "followup";
+  sentAt?: string | null;
+  type: OutreachType;
+  isAiGenerated?: boolean;
+  createdAt?: string;
 }
 
 export interface FollowUp {

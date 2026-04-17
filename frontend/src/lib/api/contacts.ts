@@ -69,3 +69,15 @@ export async function setContactSelected(
   );
   return res.data;
 }
+
+export async function setContactRepliedAt(
+  jobId: string,
+  contactId: string,
+  repliedAt: string | null
+): Promise<Contact> {
+  const res = await api.patch<PatchContactResponse>(
+    `/jobs/${jobId}/contacts/${contactId}`,
+    { replied_at: repliedAt }
+  );
+  return res.data;
+}
