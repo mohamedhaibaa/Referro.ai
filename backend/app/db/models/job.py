@@ -79,6 +79,7 @@ class Contact(Base):
     profile_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     batch_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    is_selected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     __table_args__ = (

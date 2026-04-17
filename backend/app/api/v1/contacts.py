@@ -1,5 +1,7 @@
+import json
 import uuid
 from decimal import Decimal
+from typing import Optional
 from fastapi import APIRouter, status, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
@@ -10,6 +12,30 @@ from app.db.models.user import User
 from app.db.models.credit import CreditTransaction, CAMPAIGN, REVISIT
 from app.api.deps import get_current_user
 from app.services import queue
+
+SELECTION_CAP = 3
+_PHOTO_KEYS = (
+    "photo", "photoUrl", "profilePictureUrl", "pictureUrl",
+    "avatarUrl", "picture", "profilePicture", "profile_picture_url",
+)
+
+
+def _extract_photo_url(profile_data: str | None) -> str | None:
+    """Pull a photo URL out of the stored Apify profile blob. Defensive:
+    returns None on any parse failure or missing/empty field."""
+    if not profile_data:
+        return None
+    try:
+        blob = json.loads(profile_data)
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(blob, dict):
+        return None
+    for key in _PHOTO_KEYS:
+        val = blob.get(key)
+        if isinstance(val, str) and val.strip():
+            return val
+    return None
 
 router = APIRouter()
 
@@ -57,6 +83,7 @@ def _contact_to_dict(c: Contact) -> dict:
         "company": c.company,
         "location": c.location,
         "linkedinUrl": c.linkedin_url,
+        "photoUrl": _extract_photo_url(c.profile_data),
         "university": c.university,
         "tenureMonths": c.tenure_months,
         "relevanceScore": c.relevance_score,
@@ -65,6 +92,7 @@ def _contact_to_dict(c: Contact) -> dict:
         "source": "LinkedIn",
         "batchNumber": c.batch_number,
         "roundNumber": c.round_number,
+        "isSelected": c.is_selected,
         "createdAt": c.created_at.isoformat(),
     }
 
@@ -187,6 +215,51 @@ def revisit_contacts(
         "meta": {},
         "error": None,
     }
+
+
+class PatchContactRequest(BaseModel):
+    is_selected: Optional[bool] = None
+
+
+@router.patch("/{job_id}/contacts/{contact_id}")
+def update_contact(
+    job_id: str,
+    contact_id: str,
+    body: PatchContactRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job_uuid = uuid.UUID(job_id)
+    contact = (
+        db.query(Contact)
+        .filter(
+            Contact.id == uuid.UUID(contact_id),
+            Contact.job_id == job_uuid,
+            Contact.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    if body.is_selected is True and not contact.is_selected:
+        selected_count = db.query(func.count(Contact.id)).filter(
+            Contact.job_id == job_uuid,
+            Contact.user_id == current_user.id,
+            Contact.is_selected == True,  # noqa: E712
+        ).scalar() or 0
+        if selected_count >= SELECTION_CAP:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Selection cap of {SELECTION_CAP} contacts reached",
+            )
+
+    if body.is_selected is not None:
+        contact.is_selected = body.is_selected
+
+    db.commit()
+    db.refresh(contact)
+    return {"data": _contact_to_dict(contact), "meta": {}, "error": None}
 
 
 @router.delete("/{job_id}/contacts", status_code=status.HTTP_204_NO_CONTENT)

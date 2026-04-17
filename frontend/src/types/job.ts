@@ -48,6 +48,7 @@ export interface Job {
   tags?: string[];
   outcome?: "Offer" | "Rejected" | "Withdrew" | "No response";
   activityTimeline?: ActivityItem[];
+  workflowRunId?: string | null;
 }
 
 export interface Contact {
@@ -57,6 +58,7 @@ export interface Contact {
   company: string;
   location: string;
   linkedinUrl?: string;
+  photoUrl?: string | null;
   university?: string;
   tenureMonths?: number;
   relevanceScore?: number;
@@ -65,6 +67,7 @@ export interface Contact {
   source: string;
   batchNumber?: number;
   roundNumber?: number;
+  isSelected?: boolean;
   createdAt?: string;
 }
 
