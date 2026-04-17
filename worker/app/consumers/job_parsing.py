@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 import httpx
+from azure.servicebus import ServiceBusMessage
 from azure.servicebus.aio import ServiceBusClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -79,6 +80,46 @@ async def _find_linkedin_url_via_apify(company_name: str, domain: str) -> str | 
         logger.warning("harvestapi company lookup failed for '%s': %s", company_name, exc)
 
     return None
+
+
+async def _publish_chained_discovery(db, user_id: str, job_id: uuid.UUID) -> str:
+    """Insert a queued contact-discovery WorkflowRun and publish a Service Bus
+    message so the referroing flow chains parsing → discovery in one moment.
+    Returns the new workflow_run id. Raises on any failure — the caller should
+    treat failure as soft (parsing still succeeded)."""
+    run_id = str(uuid.uuid4())
+    input_payload = {
+        "user_id": user_id,
+        "job_id": str(job_id),
+        "batch_number": 1,
+        "round_number": 1,
+    }
+
+    db.execute(
+        text("""
+            INSERT INTO workflow_runs
+                (id, user_id, job_id, type, status, input_data, created_at)
+            VALUES
+                (:id, :user_id, :job_id, 'contact-discovery', 'queued',
+                 CAST(:input_data AS jsonb), :t)
+        """),
+        {
+            "id": run_id,
+            "user_id": user_id,
+            "job_id": str(job_id),
+            "input_data": json.dumps(input_payload),
+            "t": datetime.now(timezone.utc),
+        },
+    )
+
+    message_body = json.dumps({**input_payload, "workflow_run_id": run_id})
+    async with ServiceBusClient.from_connection_string(
+        settings.SERVICE_BUS_CONNECTION_STRING
+    ) as sb_client:
+        async with sb_client.get_queue_sender("contact-discovery") as sender:
+            await sender.send_messages(ServiceBusMessage(message_body))
+
+    return run_id
 
 
 async def _process(payload: dict):
@@ -196,6 +237,15 @@ async def _process(payload: dict):
             """),
             {"id": str(uuid.uuid4()), "job_id": job_id, "user_id": user_id, "t": now()},
         )
+
+        # Chain: queue contact-discovery so the referroing flow is one continuous moment.
+        # Soft-fail: if this errors, parsing still succeeded and Room's auto-trigger
+        # fallback will cover it. We do NOT re-raise into the outer handler.
+        try:
+            discovery_run_id = await _publish_chained_discovery(db, user_id, job_id)
+            out["_chained_discovery_run_id"] = discovery_run_id
+        except Exception as chain_exc:
+            logger.warning("Chained contact-discovery publish failed: %s", chain_exc)
 
         db.execute(
             text("""
