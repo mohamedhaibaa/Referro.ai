@@ -21,11 +21,7 @@ export function useDiscoverContacts(jobId: string) {
       discoverContacts(jobId, batchNumber, roundNumber),
     onSuccess: async (result) => {
       setHasMore(result.hasMore);
-      if (result.contacts !== undefined) {
-        // Sync path: batch 2 or 3 returned directly from DB
-        qc.invalidateQueries({ queryKey: ["contacts", jobId] });
-      } else if (result.workflowRunId) {
-        // Async path: batch 1, worker is running
+      if (result.workflowRunId) {
         setIsPolling(true);
         const poll = async () => {
           const wf = await getWorkflowRun(result.workflowRunId!);

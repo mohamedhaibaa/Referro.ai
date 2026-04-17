@@ -9,8 +9,7 @@ interface ContactsResponse {
 
 interface DiscoverResponse {
   data: {
-    workflowRunId?: string;
-    contacts?: Contact[];
+    workflowRunId: string;
     batchNumber: number;
     hasMore: boolean;
   };
@@ -38,7 +37,7 @@ export async function discoverContacts(
   jobId: string,
   batchNumber: number = 1,
   roundNumber: number = 1
-): Promise<{ workflowRunId?: string; contacts?: Contact[]; batchNumber: number; hasMore: boolean }> {
+): Promise<{ workflowRunId: string; batchNumber: number; hasMore: boolean }> {
   const res = await api.post<DiscoverResponse>(`/jobs/${jobId}/contacts/discover`, {
     batch_number: batchNumber,
     round_number: roundNumber,

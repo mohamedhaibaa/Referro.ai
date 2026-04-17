@@ -24,16 +24,19 @@ SCORING_SYSTEM_PROMPT = (
     "the best people to reach out to for a coffee chat. "
     "Score each contact from 0-100 based on how useful they "
     "would be for someone applying for this role. "
-    "Scoring criteria (apply in order, scores are additive): "
+    "Scoring criteria (apply ALL that match, scores are additive): "
+    "- Same or very similar role/function as the job (e.g. both are developers, both are designers, both are marketers): +45 points. "
+    "  This is the MOST important signal. A 'Staff Developer' is the same function as a 'Software Developer' posting. "
+    "  An 'Account Manager' is NOT the same function as a 'Developer' posting. "
     "- Recruiter, HR, or Talent Acquisition role: +40 points (always high priority regardless of department) "
-    "- Same function/department as the job: +30 points "
-    "- Manager, team lead, or director (not C-suite): +20 points "
+    "- Direct manager or team lead of the role's department: +25 points "
     "- Located in same city as job: +15 points "
-    "- Tenure 0-18 months at company: +10 points "
+    "- Tenure 0-18 months at company (recently joined, can share interview tips): +10 points "
     "- Same university as candidate: +20 points "
+    "- Completely unrelated department (e.g. sales person for an engineering role): -20 points "
     "- Tenure over 10 years: -10 points "
     "- C-suite (CEO, CTO, CFO, etc.): -15 points (too senior to reach out to) "
-    "Important: Recruiters and HR roles always score at least 40. "
+    "Important: Contacts in the SAME function as the job should almost always score highest. "
     "Return ONLY a JSON array with fields: linkedin_url, score (no other text)"
 )
 
@@ -330,6 +333,24 @@ async def _process(payload: dict):
         score_map = {s["linkedin_url"]: s["score"] for s in scores}
         logger.info("AI scores received: %s", score_map)
 
+        # --- Step 3: Save to DB ---
+        # Batch 1 round 1: clear all existing contacts for a fresh campaign start
+        if batch_number == 1 and round_number == 1:
+            db.execute(
+                text("DELETE FROM contacts WHERE job_id = :job_id AND user_id = :user_id"),
+                {"job_id": job_id, "user_id": user_id},
+            )
+
+        # De-duplicate against existing contacts for this job
+        existing_urls = {
+            row[0] for row in db.execute(
+                text("SELECT linkedin_url FROM contacts WHERE job_id = :job_id AND user_id = :user_id"),
+                {"job_id": job_id, "user_id": user_id},
+            ).fetchall()
+        }
+        active_profiles = [p for p in active_profiles if p.get("linkedinUrl", "") not in existing_urls]
+        logger.info("After dedup against existing contacts: %d active remain", len(active_profiles))
+
         active_profiles.sort(
             key=lambda p: score_map.get(p.get("linkedinUrl", ""), 0),
             reverse=True,
@@ -340,14 +361,6 @@ async def _process(payload: dict):
             batch_number,
             [(p.get("linkedinUrl", ""), score_map.get(p.get("linkedinUrl", ""), 0)) for p in top3],
         )
-
-        # --- Step 3: Save to DB ---
-        # Batch 1 round 1: clear all existing contacts for a fresh campaign start
-        if batch_number == 1 and round_number == 1:
-            db.execute(
-                text("DELETE FROM contacts WHERE job_id = :job_id AND user_id = :user_id"),
-                {"job_id": job_id, "user_id": user_id},
-            )
 
         logger.info("Saving %d contacts to DB for job_id=%s (batch=%d round=%d)", len(top3), job_id, batch_number, round_number)
         for i, profile in enumerate(top3):

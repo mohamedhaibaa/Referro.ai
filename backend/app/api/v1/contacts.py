@@ -25,7 +25,16 @@ def _infer_relationship(title: str | None) -> str:
         return "Recruiter"
     if any(w in t for w in ("hiring manager",)):
         return "Hiring Manager"
-    if any(w in t for w in ("manager", "lead", "head of", "director", "vp ", "vice president")):
+    # "Account Manager", "Project Manager", "Product Manager" are individual contributor
+    # roles, not team leads. Only match management titles that imply people leadership.
+    if any(w in t for w in ("engineering manager", "development manager", "team lead",
+                             "head of", "director", "vp ", "vice president")):
+        return "Team Lead"
+    if any(w in t for w in ("manager",)) and not any(
+        w in t for w in ("account", "project", "product", "case", "client",
+                          "relationship", "community", "social media", "content",
+                          "brand", "campaign", "event", "office")
+    ):
         return "Team Lead"
     return "Employee"
 
@@ -116,45 +125,13 @@ def discover_contacts(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Batches 2 and 3: serve from DB instantly, no Apify call, no credit charge
-    if body.batch_number in (2, 3):
-        contacts = (
-            db.query(Contact)
-            .filter(
-                Contact.job_id == job_uuid,
-                Contact.user_id == current_user.id,
-                Contact.batch_number == body.batch_number,
-                Contact.round_number == body.round_number,
-            )
-            .order_by(Contact.relevance_score.desc())
-            .all()
-        )
-        batch3_exists = (
-            db.query(Contact)
-            .filter(
-                Contact.job_id == job_uuid,
-                Contact.user_id == current_user.id,
-                Contact.batch_number == 3,
-                Contact.round_number == body.round_number,
-            )
-            .count() > 0
-        )
-        has_more = body.batch_number == 2 and batch3_exists
-        return {
-            "data": {
-                "contacts": [_contact_to_dict(c) for c in contacts],
-                "batchNumber": body.batch_number,
-                "hasMore": has_more,
-            },
-            "meta": {},
-            "error": None,
-        }
-
-    # Batch 1: credit check + deduct + publish to worker
-    _deduct_credits(current_user, Decimal("1.0"), CAMPAIGN, job_uuid, db)
+    # Every batch triggers a new Apify call via the worker
+    # Credit deduction disabled until results validated
+    # if body.batch_number == 1:
+    #     _deduct_credits(current_user, Decimal("1.0"), CAMPAIGN, job_uuid, db)
     wf = queue.publish_contact_discovery(
         db, current_user.id, job_uuid,
-        batch_number=1,
+        batch_number=body.batch_number,
         round_number=body.round_number,
     )
     db.commit()
@@ -162,8 +139,8 @@ def discover_contacts(
     return {
         "data": {
             "workflowRunId": str(wf.id),
-            "batchNumber": 1,
-            "hasMore": True,
+            "batchNumber": body.batch_number,
+            "hasMore": body.batch_number < 3,
         },
         "meta": {},
         "error": None,
@@ -192,7 +169,7 @@ def revisit_contacts(
     ).scalar() or 0
     new_round = max_round + 1
 
-    _deduct_credits(current_user, Decimal("0.5"), REVISIT, job_uuid, db)
+    # _deduct_credits(current_user, Decimal("0.5"), REVISIT, job_uuid, db)
     wf = queue.publish_contact_discovery(
         db, current_user.id, job_uuid,
         batch_number=1,
