@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listJobs, getJob, createJob, updateJob, deleteJob } from "@/lib/api/jobs";
+import { listJobs, listArchivedJobs, getJob, createJob, updateJob, deleteJob } from "@/lib/api/jobs";
 import { Job } from "@/types/job";
 
 export function useJobs() {
@@ -7,6 +7,14 @@ export function useJobs() {
     queryKey: ["jobs"],
     queryFn: listJobs,
     refetchInterval: 5000, // poll every 5s so job titles update after parsing completes
+  });
+}
+
+export function useArchivedJobs(enabled = true) {
+  return useQuery({
+    queryKey: ["jobs", "archived"],
+    queryFn: listArchivedJobs,
+    enabled,
   });
 }
 

@@ -77,12 +77,13 @@ def _milestone_to_dict(m: JobMilestone) -> dict:
 
 @router.get("")
 def list_jobs(
+    archived: bool = False,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     jobs = (
         db.query(Job)
-        .filter(Job.user_id == current_user.id, Job.is_deleted == False)
+        .filter(Job.user_id == current_user.id, Job.is_deleted == archived)
         .order_by(Job.created_at.desc())
         .all()
     )

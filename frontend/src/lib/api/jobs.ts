@@ -16,6 +16,7 @@ interface ApiJob {
   progress: number;
   createdAt: string;
   updatedAt: string;
+  workflowRunId?: string | null;
 }
 
 function toJob(j: ApiJob): Job {
@@ -47,6 +48,7 @@ function toJob(j: ApiJob): Job {
       interviewPrep3: false,
       outcomeRecorded: false,
     },
+    workflowRunId: j.workflowRunId ?? null,
   };
 }
 
@@ -63,6 +65,11 @@ interface SingleJobResponse {
 
 export async function listJobs(): Promise<Job[]> {
   const res = await api.get<ListJobsResponse>("/jobs");
+  return res.data.map(toJob);
+}
+
+export async function listArchivedJobs(): Promise<Job[]> {
+  const res = await api.get<ListJobsResponse>("/jobs?archived=true");
   return res.data.map(toJob);
 }
 
