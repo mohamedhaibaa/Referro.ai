@@ -4,6 +4,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ReferroingProvider } from "./contexts/ReferroingContext";
+import ReferroingOverlay from "./components/referroing/ReferroingOverlay";
+import ReferroingPill from "./components/referroing/ReferroingPill";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
@@ -26,20 +29,24 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
-            <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
-            <Route path="/job/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
-            <Route path="/jobs/:id/room" element={<ProtectedRoute><Room /></ProtectedRoute>} />
-            <Route path="/jobs/:id/contacts/:contactId/coffee-chat-prep" element={<ProtectedRoute><CoffeeChatPrep /></ProtectedRoute>} />
-            <Route path="/jobs/:id/contacts/:contactId/interview-prep" element={<ProtectedRoute><InterviewPrep /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <ReferroingProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+              <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
+              <Route path="/job/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
+              <Route path="/jobs/:id/room" element={<ProtectedRoute><Room /></ProtectedRoute>} />
+              <Route path="/jobs/:id/contacts/:contactId/coffee-chat-prep" element={<ProtectedRoute><CoffeeChatPrep /></ProtectedRoute>} />
+              <Route path="/jobs/:id/contacts/:contactId/interview-prep" element={<ProtectedRoute><InterviewPrep /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <ReferroingOverlay />
+            <ReferroingPill />
+          </ReferroingProvider>
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
