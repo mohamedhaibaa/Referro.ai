@@ -6,9 +6,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
+import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import Inbox from "./pages/Inbox";
 import JobDetail from "./pages/JobDetail";
+import Room from "./pages/Room";
+import CoffeeChatPrep from "./pages/CoffeeChatPrep";
+import InterviewPrep from "./pages/InterviewPrep";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -25,10 +29,14 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
-            <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
             <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
             <Route path="/job/:id" element={<ProtectedRoute><JobDetail /></ProtectedRoute>} />
+            <Route path="/jobs/:id/room" element={<ProtectedRoute><Room /></ProtectedRoute>} />
+            <Route path="/jobs/:id/contacts/:contactId/coffee-chat-prep" element={<ProtectedRoute><CoffeeChatPrep /></ProtectedRoute>} />
+            <Route path="/jobs/:id/contacts/:contactId/interview-prep" element={<ProtectedRoute><InterviewPrep /></ProtectedRoute>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
