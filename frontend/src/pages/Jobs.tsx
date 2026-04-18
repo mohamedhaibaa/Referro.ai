@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import JobCard from "@/components/jobs/JobCard";
-import { useJobs, useArchivedJobs, useDeleteJob } from "@/hooks/useJobs";
+import { useJobs, useArchivedJobs, useDeleteJob, useRestoreJob } from "@/hooks/useJobs";
 import { Job } from "@/types/job";
 import { stageSortIndex } from "@/lib/jobStagePill";
 
@@ -53,6 +53,7 @@ const Jobs = () => {
   const { data: activeJobs = [], isLoading: activeLoading } = useJobs();
   const { data: archivedJobs = [], isLoading: archivedLoading } = useArchivedJobs(tab === "archived");
   const deleteJob = useDeleteJob();
+  const restoreJob = useRestoreJob();
 
   const setSort = (next: SortKey) => {
     const sp = new URLSearchParams(searchParams);
@@ -70,6 +71,23 @@ const Jobs = () => {
       },
       onError: () => {
         toast.error("Could not archive job");
+      },
+    });
+  };
+
+  const handleRestore = (job: Job) => {
+    restoreJob.mutate(job.id, {
+      onSuccess: () => {
+        toast("Restored", {
+          description: `${job.company || "Job"} moved back to Active.`,
+          action: {
+            label: "Undo",
+            onClick: () => deleteJob.mutate(job.id),
+          },
+        });
+      },
+      onError: () => {
+        toast.error("Could not restore job");
       },
     });
   };
@@ -121,12 +139,6 @@ const Jobs = () => {
           </Select>
         </div>
 
-        {tab === "archived" && (
-          <p className="mb-4 text-xs text-muted-foreground">
-            Restore is coming soon — archived jobs are read-only for now.
-          </p>
-        )}
-
         {isLoading ? (
           <div className="text-muted-foreground text-sm py-8">Loading jobs...</div>
         ) : isEmpty ? (
@@ -148,6 +160,7 @@ const Jobs = () => {
                 job={job}
                 archived={tab === "archived"}
                 onArchive={tab === "active" ? handleArchive : undefined}
+                onRestore={tab === "archived" ? handleRestore : undefined}
               />
             ))}
           </div>

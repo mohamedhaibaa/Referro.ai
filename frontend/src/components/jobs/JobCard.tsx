@@ -14,9 +14,10 @@ interface JobCardProps {
   job: Job;
   archived?: boolean;
   onArchive?: (job: Job) => void;
+  onRestore?: (job: Job) => void;
 }
 
-const JobCard = ({ job, archived = false, onArchive }: JobCardProps) => {
+const JobCard = ({ job, archived = false, onArchive, onRestore }: JobCardProps) => {
   const pill = getStagePill(job.status, job.contactStatuses);
   const isParsing = !job.title || job.title === "Untitled";
   const monogram = (job.company?.[0] ?? job.title?.[0] ?? "?").toUpperCase();
@@ -40,7 +41,7 @@ const JobCard = ({ job, archived = false, onArchive }: JobCardProps) => {
           )}
         </div>
 
-        {!archived && onArchive && (
+        {((!archived && onArchive) || (archived && onRestore)) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={stopNav}>
               <button
@@ -51,12 +52,18 @@ const JobCard = ({ job, archived = false, onArchive }: JobCardProps) => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={stopNav}>
-              <DropdownMenuItem
-                onSelect={() => onArchive(job)}
-                className="text-destructive focus:text-destructive"
-              >
-                Archive
-              </DropdownMenuItem>
+              {archived && onRestore ? (
+                <DropdownMenuItem onSelect={() => onRestore(job)}>
+                  Restore
+                </DropdownMenuItem>
+              ) : onArchive ? (
+                <DropdownMenuItem
+                  onSelect={() => onArchive(job)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  Archive
+                </DropdownMenuItem>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

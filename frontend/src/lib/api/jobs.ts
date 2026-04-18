@@ -103,6 +103,11 @@ export async function deleteJob(id: string): Promise<void> {
   await api.delete(`/jobs/${id}`);
 }
 
+export async function restoreJob(id: string): Promise<Job> {
+  const res = await api.post<SingleJobResponse>(`/jobs/${id}/restore`, {});
+  return toJob(res.data);
+}
+
 export interface Milestones {
   resumeTailored: boolean;
   contactSelected: boolean;

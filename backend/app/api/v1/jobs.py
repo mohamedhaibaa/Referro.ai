@@ -218,6 +218,30 @@ def delete_job(
     return
 
 
+@router.post("/{job_id}/restore")
+def restore_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(
+        Job.id == job_id,
+        Job.user_id == current_user.id,
+    ).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job.is_deleted:
+        raise HTTPException(status_code=400, detail="Job is not archived")
+
+    job.is_deleted = False
+    db.commit()
+    db.refresh(job)
+    return {
+        "data": _job_to_dict(job, _contact_statuses_for_job(job.id, current_user.id, db)),
+        "error": None,
+    }
+
+
 @router.get("/{job_id}/milestones")
 def get_milestones(
     job_id: str,
