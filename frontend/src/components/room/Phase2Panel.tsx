@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { CircleSlash } from "lucide-react";
 import { Contact, Job } from "@/types/job";
 import { useContacts } from "@/hooks/useContacts";
 import { STATES, shortStatusBadge } from "@/lib/contactLifecycle";
@@ -38,6 +39,15 @@ const Phase2Panel = ({ job }: Phase2PanelProps) => {
     c.lifecycleStatus && c.lifecycleStatus !== STATES.NOT_CONTACTED && c.lifecycleStatus !== STATES.DRAFTED
   ).length;
 
+  const allClosedNoOffer = useMemo(() => {
+    if (selected.length === 0) return false;
+    const everyClosed = selected.every(
+      (c) => c.lifecycleStatus?.startsWith("outcome_")
+    );
+    const anyOffer = selected.some((c) => c.lifecycleStatus === STATES.OUTCOME_OFFER);
+    return everyClosed && !anyOffer;
+  }, [selected]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -46,6 +56,15 @@ const Phase2Panel = ({ job }: Phase2PanelProps) => {
           Click a contact to draft and track your outreach. {sentCount}/{selected.length} contacted.
         </p>
       </div>
+
+      {allClosedNoOffer && (
+        <div className="flex items-start gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+          <CircleSlash className="w-4 h-4 shrink-0 mt-0.5" />
+          <p>
+            All 3 contacts are in closed states. You can revisit the job or start fresh from the Jobs page.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {selected.map((c) => (

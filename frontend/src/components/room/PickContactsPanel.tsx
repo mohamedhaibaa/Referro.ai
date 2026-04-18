@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw, Loader2, AlertCircle } from "lucide-react";
 import { Contact } from "@/types/job";
 import ContactCard from "./ContactCard";
+import EmptyState from "@/components/ui/EmptyState";
+import { RadarSweepIllustration } from "@/components/ui/EmptyIllustrations";
 import { useContacts, useDiscoverContacts, useRevisitContacts } from "@/hooks/useContacts";
 import { useToggleContactSelection } from "@/hooks/useContactSelection";
 
@@ -109,7 +111,7 @@ const PickContactsPanel = ({ jobId, onConfirm, confirming }: PickContactsPanelPr
 
   // Loading & bootstrap states
   if (isLoading || (contacts.length === 0 && busy)) {
-    return <LoadingPanel label="Finding your contacts…" />;
+    return <LoadingPanel />;
   }
 
   if (contacts.length === 0 && !busy) {
@@ -196,9 +198,13 @@ const PickContactsPanel = ({ jobId, onConfirm, confirming }: PickContactsPanelPr
   );
 };
 
-const LoadingPanel = ({ label }: { label: string }) => (
-  <div className="flex flex-col items-center justify-center gap-6 py-20">
-    <div className="flex items-center gap-1.5">
+const LoadingPanel = () => (
+  <EmptyState
+    illustration={<RadarSweepIllustration />}
+    headline="Finding the right people..."
+    body="We're scanning LinkedIn for potential contacts at this company."
+  >
+    <div className="flex items-center gap-1.5" aria-hidden>
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -210,8 +216,7 @@ const LoadingPanel = ({ label }: { label: string }) => (
         />
       ))}
     </div>
-    <p className="text-sm text-muted-foreground">{label}</p>
-  </div>
+  </EmptyState>
 );
 
 const ErrorPanel = ({

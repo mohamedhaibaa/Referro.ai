@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import JobCard from "@/components/jobs/JobCard";
+import EmptyState from "@/components/ui/EmptyState";
+import { PathForwardIllustration, EmptyBoxIllustration } from "@/components/ui/EmptyIllustrations";
+import { useNavigate } from "react-router-dom";
 import { useJobs, useArchivedJobs, useDeleteJob, useRestoreJob } from "@/hooks/useJobs";
 import { Job } from "@/types/job";
 import { stageSortIndex } from "@/lib/jobStagePill";
@@ -43,6 +46,7 @@ function filterJobs(jobs: Job[], query: string): Job[] {
 }
 
 const Jobs = () => {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const sortParam = searchParams.get("sort") as SortKey | null;
   const sort: SortKey = sortParam && SORT_KEYS.includes(sortParam) ? sortParam : "recent";
@@ -141,16 +145,24 @@ const Jobs = () => {
 
         {isLoading ? (
           <div className="text-muted-foreground text-sm py-8">Loading jobs...</div>
+        ) : isEmpty && !query ? (
+          tab === "archived" ? (
+            <EmptyState
+              illustration={<EmptyBoxIllustration />}
+              headline="Nothing archived yet"
+              body="Archived jobs will appear here. Your active search is where the action is."
+            />
+          ) : (
+            <EmptyState
+              illustration={<PathForwardIllustration />}
+              headline="Let's find your first job 🚀"
+              body="Paste a LinkedIn job URL on the Home page and we'll handle the rest."
+              cta={{ label: "Go to Home →", onClick: () => navigate("/") }}
+            />
+          )
         ) : isEmpty ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-muted-foreground mb-2">
-              {tab === "archived" ? "No archived jobs." : "No jobs yet."}
-            </p>
-            {tab === "active" && !query && (
-              <a href="/" className="text-sm text-primary hover:underline">
-                Paste a job URL on Home to start your first Referro →
-              </a>
-            )}
+            <p className="text-muted-foreground">No jobs match your search.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
