@@ -17,7 +17,7 @@ interface JobCardProps {
 }
 
 const JobCard = ({ job, archived = false, onArchive }: JobCardProps) => {
-  const pill = getStagePill(job.status);
+  const pill = getStagePill(job.status, job.contactStatuses);
   const isParsing = !job.title || job.title === "Untitled";
   const monogram = (job.company?.[0] ?? job.title?.[0] ?? "?").toUpperCase();
 

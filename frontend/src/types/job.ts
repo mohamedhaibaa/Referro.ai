@@ -25,6 +25,7 @@ export interface Job {
   fitScore?: FitScore;
   workMode?: WorkMode;
   roleFamily?: RoleFamily;
+  contactStatuses?: string[];
   hasSelectedContact: boolean;
   hasOutreachDraft: boolean;
   outreachMarkedSent: boolean;
@@ -70,6 +71,12 @@ export interface Contact {
   isSelected?: boolean;
   lifecycleStatus?: string;
   repliedAt?: string | null;
+  coffeeChatScheduledAt?: string | null;
+  coffeeChatCompletedAt?: string | null;
+  interviewScheduledAt?: string | null;
+  interviewCompletedAt?: string | null;
+  outcome?: string | null;
+  outcomeRecordedAt?: string | null;
   createdAt?: string;
 }
 

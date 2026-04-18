@@ -45,7 +45,7 @@ const Room = () => {
     );
   }
 
-  const pill = getStagePill(job.status);
+  const pill = getStagePill(job.status, job.contactStatuses);
   const isPhase2 = milestones?.contactSelected === true;
 
   return (

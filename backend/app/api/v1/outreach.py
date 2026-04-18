@@ -15,6 +15,16 @@ router = APIRouter()
 
 
 VALID_TYPES = {"initial", "followup_1", "followup_2"}
+VALID_OUTCOMES = {
+    "offer",
+    "rejected",
+    "withdrew",
+    "not_right_person",
+    "not_a_fit",
+    "lost_touch",
+    "cancelled",
+    "company_cancelled",
+}
 NOT_CONTACTED = "not_contacted"
 
 
@@ -33,11 +43,27 @@ def _outreach_to_dict(m: OutreachMessage) -> dict:
 
 def _derive_lifecycle_status(contact: Contact, messages: list[OutreachMessage]) -> str:
     """Source of truth for state. Called by every endpoint that mutates
-    messages or replied_at. Server owns this — client reads only."""
+    messages, replied_at, or any Stage 6 lifecycle column. Server owns this —
+    client reads only.
+
+    Priority chain (highest first — each short-circuits):
+      outcome > interview_completed > interview_scheduled >
+      coffee_chat_completed > coffee_chat_scheduled > replied >
+      (message-derived: followup_2 > followup_1 > initial) > not_contacted
+    """
+    if contact.outcome in VALID_OUTCOMES:
+        return f"outcome_{contact.outcome}"
+    if contact.interview_completed_at is not None:
+        return "interview_completed"
+    if contact.interview_scheduled_at is not None:
+        return "interview_scheduled"
+    if contact.coffee_chat_completed_at is not None:
+        return "coffee_chat_completed"
+    if contact.coffee_chat_scheduled_at is not None:
+        return "coffee_chat_scheduled"
     if contact.replied_at is not None:
         return "replied"
 
-    # Order messages by creation time; newest-first for "is there a draft?" check
     ordered = sorted(messages, key=lambda m: m.created_at)
     by_type = {m.type: m for m in ordered}
 

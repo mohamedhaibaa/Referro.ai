@@ -4,11 +4,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Contact, Job } from "@/types/job";
-import { setContactRepliedAt } from "@/lib/api/contacts";
+import { patchContact, setContactRepliedAt } from "@/lib/api/contacts";
 import { useContactOutreach, useDeleteOutreach, useUpdateOutreach } from "@/hooks/useOutreach";
-import { STATES, statusLabel } from "@/lib/contactLifecycle";
+import { STATES, isPostReplyState, statusLabel } from "@/lib/contactLifecycle";
 import StateTimeline from "./StateTimeline";
 import MessageDraftView from "./MessageDraftView";
+import PostReplyView from "./PostReplyView";
 
 interface ContactPopupProps {
   job: Job;
@@ -38,6 +39,27 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
     },
   });
 
+  type ClearableField =
+    | "coffee_chat_scheduled_at"
+    | "coffee_chat_completed_at"
+    | "interview_scheduled_at"
+    | "interview_completed_at"
+    | "outcome";
+
+  const clearField = useMutation({
+    mutationFn: (field: ClearableField) =>
+      patchContact(job.id, contact!.id, { [field]: null } as Parameters<typeof patchContact>[2]),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contacts", job.id] });
+    },
+    onError: (err: unknown) => {
+      const msg = err instanceof Error ? err.message : "Could not update contact";
+      toast.error(msg);
+    },
+  });
+
+  const setTimestampField = (field: ClearableField) => clearField.mutate(field);
+
   const status = contact?.lifecycleStatus ?? STATES.NOT_CONTACTED;
   const monogram = useMemo(() => {
     if (!contact?.fullName) return "?";
@@ -55,6 +77,37 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
 
     if (status === STATES.REPLIED) {
       setReplied.mutate(null);
+      return;
+    }
+
+    // Stage 6 post-reply state undos: clear the most-recent timestamp or outcome.
+    if (status === STATES.COFFEE_CHAT_SCHEDULED) {
+      setTimestampField("coffee_chat_scheduled_at");
+      return;
+    }
+    if (status === STATES.COFFEE_CHAT_COMPLETED) {
+      setTimestampField("coffee_chat_completed_at");
+      return;
+    }
+    if (status === STATES.INTERVIEW_SCHEDULED) {
+      setTimestampField("interview_scheduled_at");
+      return;
+    }
+    if (status === STATES.INTERVIEW_COMPLETED) {
+      setTimestampField("interview_completed_at");
+      return;
+    }
+    if (
+      status === STATES.OUTCOME_OFFER ||
+      status === STATES.OUTCOME_REJECTED ||
+      status === STATES.OUTCOME_WITHDREW ||
+      status === STATES.OUTCOME_NOT_RIGHT_PERSON ||
+      status === STATES.OUTCOME_NOT_A_FIT ||
+      status === STATES.OUTCOME_LOST_TOUCH ||
+      status === STATES.OUTCOME_CANCELLED ||
+      status === STATES.OUTCOME_COMPANY_CANCELLED
+    ) {
+      setTimestampField("outcome");
       return;
     }
 
@@ -144,13 +197,23 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
           </div>
 
           <div className="p-6 max-h-[60vh] overflow-y-auto">
-            <MessageDraftView
-              job={job}
-              contact={contact}
-              messages={messages}
-              onMarkReplied={handleMarkReplied}
-              onUndo={handleUndo}
-            />
+            {isPostReplyState(status) ? (
+              <PostReplyView
+                job={job}
+                contact={contact}
+                messages={messages}
+                onUndo={handleUndo}
+                onClose={() => onOpenChange(false)}
+              />
+            ) : (
+              <MessageDraftView
+                job={job}
+                contact={contact}
+                messages={messages}
+                onMarkReplied={handleMarkReplied}
+                onUndo={handleUndo}
+              />
+            )}
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

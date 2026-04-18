@@ -16,6 +16,7 @@ import JobDetail from "./pages/JobDetail";
 import Room from "./pages/Room";
 import CoffeeChatPrep from "./pages/CoffeeChatPrep";
 import InterviewPrep from "./pages/InterviewPrep";
+import PitchDeck from "./pages/PitchDeck";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -41,6 +42,7 @@ const App = () => (
               <Route path="/jobs/:id/room" element={<ProtectedRoute><Room /></ProtectedRoute>} />
               <Route path="/jobs/:id/contacts/:contactId/coffee-chat-prep" element={<ProtectedRoute><CoffeeChatPrep /></ProtectedRoute>} />
               <Route path="/jobs/:id/contacts/:contactId/interview-prep" element={<ProtectedRoute><InterviewPrep /></ProtectedRoute>} />
+              <Route path="/jobs/:id/contacts/:contactId/pitch-deck" element={<ProtectedRoute><PitchDeck /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronRight, Copy, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Contact, OutreachMessage, OutreachType, Job } from "@/types/job";
@@ -51,6 +52,7 @@ function relativeFrom(iso: string | null | undefined): string {
 }
 
 const MessageDraftView = ({ job, contact, messages, onMarkReplied, onUndo }: MessageDraftViewProps) => {
+  const navigate = useNavigate();
   const status = contact.lifecycleStatus ?? STATES.NOT_CONTACTED;
 
   const createOutreach = useCreateOutreach(job.id, contact.id);
@@ -247,6 +249,13 @@ const MessageDraftView = ({ job, contact, messages, onMarkReplied, onUndo }: Mes
           <span className="text-[11px] text-muted-foreground">
             ✨ placeholder — real AI generation coming soon
           </span>
+          <button
+            type="button"
+            onClick={() => navigate(`/jobs/${job.id}/contacts/${contact.id}/pitch-deck`)}
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline underline-offset-4 mt-1"
+          >
+            Or send a pitch deck →
+          </button>
         </div>
       </div>
     );

@@ -41,7 +41,7 @@ class PatchMilestonesRequest(BaseModel):
     outcome_recorded: Optional[bool] = None
 
 
-def _job_to_dict(job: Job) -> dict:
+def _job_to_dict(job: Job, contact_statuses: list[str] | None = None) -> dict:
     return {
         "id": str(job.id),
         "title": job.title,
@@ -55,9 +55,19 @@ def _job_to_dict(job: Job) -> dict:
         "roleFamily": job.role_family,
         "dueDate": job.due_date.isoformat() if job.due_date else None,
         "progress": job.progress,
+        "contactStatuses": contact_statuses or [],
         "createdAt": job.created_at.isoformat(),
         "updatedAt": job.updated_at.isoformat(),
     }
+
+
+def _contact_statuses_for_job(job_id, user_id, db: Session) -> list[str]:
+    rows = db.query(Contact.lifecycle_status).filter(
+        Contact.job_id == job_id,
+        Contact.user_id == user_id,
+        Contact.is_selected == True,  # noqa: E712
+    ).all()
+    return [r[0] for r in rows if r[0]]
 
 
 def _milestone_to_dict(m: JobMilestone) -> dict:
@@ -87,8 +97,20 @@ def list_jobs(
         .order_by(Job.created_at.desc())
         .all()
     )
+
+    # Bulk-load selected contacts' statuses grouped by job
+    rows = db.query(Contact.job_id, Contact.lifecycle_status).filter(
+        Contact.user_id == current_user.id,
+        Contact.is_selected == True,  # noqa: E712
+    ).all()
+    by_job: dict = {}
+    for jid, status_str in rows:
+        if not status_str:
+            continue
+        by_job.setdefault(jid, []).append(status_str)
+
     return {
-        "data": [_job_to_dict(j) for j in jobs],
+        "data": [_job_to_dict(j, by_job.get(j.id, [])) for j in jobs],
         "meta": {"total": len(jobs)},
         "error": None,
     }
@@ -140,7 +162,7 @@ def get_job(
     ).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    return {"data": _job_to_dict(job), "error": None}
+    return {"data": _job_to_dict(job, _contact_statuses_for_job(job.id, current_user.id, db)), "error": None}
 
 
 @router.patch("/{job_id}")
@@ -174,7 +196,7 @@ def update_job(
 
     db.commit()
     db.refresh(job)
-    return {"data": _job_to_dict(job), "error": None}
+    return {"data": _job_to_dict(job, _contact_statuses_for_job(job.id, current_user.id, db)), "error": None}
 
 
 @router.delete("/{job_id}", status_code=status.HTTP_204_NO_CONTENT)

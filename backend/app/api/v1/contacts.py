@@ -95,6 +95,12 @@ def _contact_to_dict(c: Contact) -> dict:
         "isSelected": c.is_selected,
         "lifecycleStatus": c.lifecycle_status,
         "repliedAt": c.replied_at.isoformat() if c.replied_at else None,
+        "coffeeChatScheduledAt": c.coffee_chat_scheduled_at.isoformat() if c.coffee_chat_scheduled_at else None,
+        "coffeeChatCompletedAt": c.coffee_chat_completed_at.isoformat() if c.coffee_chat_completed_at else None,
+        "interviewScheduledAt": c.interview_scheduled_at.isoformat() if c.interview_scheduled_at else None,
+        "interviewCompletedAt": c.interview_completed_at.isoformat() if c.interview_completed_at else None,
+        "outcome": c.outcome,
+        "outcomeRecordedAt": c.outcome_recorded_at.isoformat() if c.outcome_recorded_at else None,
         "createdAt": c.created_at.isoformat(),
     }
 
@@ -221,7 +227,63 @@ def revisit_contacts(
 
 class PatchContactRequest(BaseModel):
     is_selected: Optional[bool] = None
-    replied_at: Optional[str] = None  # ISO-8601 to set, explicit None to clear
+    replied_at: Optional[str] = None
+    coffee_chat_scheduled_at: Optional[str] = None
+    coffee_chat_completed_at: Optional[str] = None
+    interview_scheduled_at: Optional[str] = None
+    interview_completed_at: Optional[str] = None
+    outcome: Optional[str] = None
+    outcome_recorded_at: Optional[str] = None
+
+
+_TIMESTAMP_FIELDS = (
+    "replied_at",
+    "coffee_chat_scheduled_at",
+    "coffee_chat_completed_at",
+    "interview_scheduled_at",
+    "interview_completed_at",
+    "outcome_recorded_at",
+)
+
+_ACTIVITY_LABELS = {
+    "replied_at":                "They replied",
+    "coffee_chat_scheduled_at":  "Coffee chat scheduled",
+    "coffee_chat_completed_at":  "Coffee chat completed",
+    "interview_scheduled_at":    "Interview scheduled",
+    "interview_completed_at":    "Interview completed",
+}
+
+_OUTCOME_LABELS = {
+    "offer":              "Recorded outcome: got the offer",
+    "rejected":           "Recorded outcome: rejected",
+    "withdrew":           "Recorded outcome: withdrew",
+    "not_right_person":   "Recorded outcome: not the right person",
+    "not_a_fit":          "Recorded outcome: not a fit",
+    "lost_touch":         "Recorded outcome: lost touch",
+    "cancelled":          "Recorded outcome: cancelled",
+    "company_cancelled":  "Recorded outcome: company cancelled",
+}
+
+
+def _parse_iso(value: str, field: str):
+    from datetime import datetime
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{field} must be ISO-8601")
+
+
+def _log_contact_milestone(db: Session, contact: Contact, description: str) -> None:
+    from datetime import datetime, timezone
+    from app.db.models.job import ActivityLog
+    db.add(ActivityLog(
+        job_id=contact.job_id,
+        user_id=contact.user_id,
+        contact_id=contact.id,
+        type="contact_milestone",
+        action=description,
+        created_at=datetime.now(timezone.utc),
+    ))
 
 
 @router.patch("/{job_id}/contacts/{contact_id}")
@@ -232,8 +294,8 @@ def update_contact(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    from datetime import datetime
-    from app.api.v1.outreach import _recompute_and_persist
+    from datetime import datetime, timezone
+    from app.api.v1.outreach import _recompute_and_persist, VALID_OUTCOMES
 
     job_uuid = uuid.UUID(job_id)
     contact = (
@@ -264,14 +326,45 @@ def update_contact(
         contact.is_selected = body.is_selected
 
     fields = body.model_dump(exclude_unset=True)
-    if "replied_at" in fields:
-        if body.replied_at is None:
-            contact.replied_at = None
+    contact_name = contact.full_name or "contact"
+    lifecycle_touched = False
+
+    for field in _TIMESTAMP_FIELDS:
+        if field not in fields:
+            continue
+        value = getattr(body, field)
+        previous = getattr(contact, field)
+        if value is None:
+            setattr(contact, field, None)
         else:
-            try:
-                contact.replied_at = datetime.fromisoformat(body.replied_at.replace("Z", "+00:00"))
-            except ValueError:
-                raise HTTPException(status_code=400, detail="replied_at must be ISO-8601")
+            setattr(contact, field, _parse_iso(value, field))
+        lifecycle_touched = True
+        # Log setting transitions (not clears) for the 5 labeled fields
+        if value is not None and previous is None and field in _ACTIVITY_LABELS:
+            _log_contact_milestone(db, contact, f"{_ACTIVITY_LABELS[field]} for {contact_name}")
+
+    if "outcome" in fields:
+        if body.outcome is None:
+            contact.outcome = None
+            # Clearing outcome also clears recorded_at so it doesn't orphan
+            contact.outcome_recorded_at = None
+        else:
+            if body.outcome not in VALID_OUTCOMES:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"outcome must be one of {sorted(VALID_OUTCOMES)}",
+                )
+            previous_outcome = contact.outcome
+            contact.outcome = body.outcome
+            if "outcome_recorded_at" not in fields:
+                contact.outcome_recorded_at = datetime.now(timezone.utc)
+            if previous_outcome != body.outcome:
+                _log_contact_milestone(
+                    db, contact, f"{_OUTCOME_LABELS[body.outcome]} for {contact_name}",
+                )
+        lifecycle_touched = True
+
+    if lifecycle_touched:
         _recompute_and_persist(contact, db)
 
     db.commit()

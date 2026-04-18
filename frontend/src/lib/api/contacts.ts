@@ -81,3 +81,21 @@ export async function setContactRepliedAt(
   );
   return res.data;
 }
+
+export async function patchContact(
+  jobId: string,
+  contactId: string,
+  patch: {
+    coffee_chat_scheduled_at?: string | null;
+    coffee_chat_completed_at?: string | null;
+    interview_scheduled_at?: string | null;
+    interview_completed_at?: string | null;
+    outcome?: string | null;
+  }
+): Promise<Contact> {
+  const res = await api.patch<PatchContactResponse>(
+    `/jobs/${jobId}/contacts/${contactId}`,
+    patch
+  );
+  return res.data;
+}

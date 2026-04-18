@@ -82,6 +82,12 @@ class Contact(Base):
     is_selected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lifecycle_status: Mapped[str] = mapped_column(String(40), nullable=False, default="not_contacted")
     replied_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    coffee_chat_scheduled_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    coffee_chat_completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    interview_scheduled_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    interview_completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    outcome_recorded_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
     __table_args__ = (
@@ -169,6 +175,8 @@ class ActivityLog(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("jobs.id"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("contacts.id"), nullable=True)
+    type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     action: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 

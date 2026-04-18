@@ -1,8 +1,5 @@
 import { JobStatus } from "@/types/job";
 
-// TODO (Stage 6): derive from per-contact lifecycle once the 11-state model exists;
-// today this maps the job's manual status field only.
-
 export type StageTone =
   | "neutral"
   | "early-active"
@@ -16,7 +13,7 @@ export interface StagePill {
   tone: StageTone;
 }
 
-const MAP: Record<JobStatus, StagePill> = {
+const LEGACY_MAP: Record<JobStatus, StagePill> = {
   "Interested":       { label: "Ready to reach out", tone: "neutral" },
   "Outreach Ready":   { label: "Ready to reach out", tone: "neutral" },
   "Outreach Sent":    { label: "Outreach Sent",      tone: "early-active" },
@@ -27,8 +24,46 @@ const MAP: Record<JobStatus, StagePill> = {
   "Closed":           { label: "Closed",             tone: "closed" },
 };
 
-export function getStagePill(status: JobStatus): StagePill {
-  return MAP[status] ?? MAP["Interested"];
+function isOutcomeStatus(s: string): boolean {
+  return s.startsWith("outcome_");
+}
+
+/** Derive the job-level pill from the per-contact lifecycle statuses.
+ * Falls back to the legacy Job.status mapping if contactStatuses is absent or empty.
+ *
+ * Priority:
+ *   1. Any outcome_offer → Landed 🎉
+ *   2. Most-progressed active (non-outcome) contact drives the pill
+ *   3. All contacts in some outcome (none offer) → Closed
+ *   4. Else → Ready to reach out
+ */
+export function getStagePill(status: JobStatus, contactStatuses?: string[]): StagePill {
+  const arr = contactStatuses ?? [];
+  if (arr.length === 0) return LEGACY_MAP[status] ?? LEGACY_MAP["Interested"];
+
+  // 1. Any offer wins.
+  if (arr.includes("outcome_offer")) {
+    return { label: "Landed 🎉", tone: "landed" };
+  }
+
+  // 2. Consider only contacts still in an active (non-outcome) state.
+  const active = arr.filter((s) => !isOutcomeStatus(s));
+
+  if (active.length > 0) {
+    const hasAny = (...prefixes: string[]) =>
+      active.some((st) => prefixes.some((p) => st === p || st.startsWith(p)));
+
+    if (hasAny("interview_scheduled", "interview_completed")) return { label: "Interview Stage", tone: "late-active" };
+    if (hasAny("coffee_chat_scheduled", "coffee_chat_completed")) return { label: "Coffee Chat", tone: "mid-active" };
+    if (active.includes("replied")) return { label: "In Conversation", tone: "early-active" };
+    if (hasAny("sent", "followup_1_sent", "followup_2_sent")) return { label: "Outreach Sent", tone: "early-active" };
+    if (hasAny("drafted", "followup_1_drafted", "followup_2_drafted")) return { label: "Drafting", tone: "neutral" };
+
+    return { label: "Ready to reach out", tone: "neutral" };
+  }
+
+  // 3. All contacts are terminal outcomes (and no offer, from step 1). Job is closed.
+  return { label: "Closed", tone: "closed" };
 }
 
 export const TONE_CLASSES: Record<StageTone, string> = {

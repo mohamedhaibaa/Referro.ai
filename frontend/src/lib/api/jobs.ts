@@ -17,6 +17,7 @@ interface ApiJob {
   createdAt: string;
   updatedAt: string;
   workflowRunId?: string | null;
+  contactStatuses?: string[];
 }
 
 function toJob(j: ApiJob): Job {
@@ -49,6 +50,7 @@ function toJob(j: ApiJob): Job {
       outcomeRecorded: false,
     },
     workflowRunId: j.workflowRunId ?? null,
+    contactStatuses: j.contactStatuses ?? [],
   };
 }
 
