@@ -7,6 +7,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ReferroingProvider } from "./contexts/ReferroingContext";
 import ReferroingOverlay from "./components/referroing/ReferroingOverlay";
 import ReferroingPill from "./components/referroing/ReferroingPill";
+import ErrorBoundary from "./components/ErrorBoundary";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
@@ -25,6 +26,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <ErrorBoundary>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
@@ -52,6 +54,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
+    </ErrorBoundary>
   </QueryClientProvider>
 );
 

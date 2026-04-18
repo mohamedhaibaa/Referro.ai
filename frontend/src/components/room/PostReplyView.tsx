@@ -57,9 +57,8 @@ const PostReplyView = ({ job, contact, messages, onUndo, onClose }: PostReplyVie
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contacts", job.id] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not update contact";
-      toast.error(msg);
+    onError: () => {
+      toast.error("Couldn't save that change. Try again?");
     },
   });
 

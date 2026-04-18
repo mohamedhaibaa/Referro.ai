@@ -15,6 +15,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import JobCard from "@/components/jobs/JobCard";
 import EmptyState from "@/components/ui/EmptyState";
+import ErrorState from "@/components/ui/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PathForwardIllustration, EmptyBoxIllustration } from "@/components/ui/EmptyIllustrations";
 import { useNavigate } from "react-router-dom";
 import { useJobs, useArchivedJobs, useDeleteJob, useRestoreJob } from "@/hooks/useJobs";
@@ -54,8 +56,12 @@ const Jobs = () => {
   const [tab, setTab] = useState<"active" | "archived">("active");
   const [query, setQuery] = useState("");
 
-  const { data: activeJobs = [], isLoading: activeLoading } = useJobs();
-  const { data: archivedJobs = [], isLoading: archivedLoading } = useArchivedJobs(tab === "archived");
+  const activeQuery = useJobs();
+  const archivedQuery = useArchivedJobs(tab === "archived");
+  const activeJobs = activeQuery.data ?? [];
+  const archivedJobs = archivedQuery.data ?? [];
+  const activeLoading = activeQuery.isLoading;
+  const archivedLoading = archivedQuery.isLoading;
   const deleteJob = useDeleteJob();
   const restoreJob = useRestoreJob();
 
@@ -74,7 +80,7 @@ const Jobs = () => {
         });
       },
       onError: () => {
-        toast.error("Could not archive job");
+        toast.error("Couldn't archive the job right now.");
       },
     });
   };
@@ -91,16 +97,18 @@ const Jobs = () => {
         });
       },
       onError: () => {
-        toast.error("Could not restore job");
+        toast.error("Couldn't restore the job right now.");
       },
     });
   };
 
   const rawJobs = tab === "archived" ? archivedJobs : activeJobs;
   const isLoading = tab === "archived" ? archivedLoading : activeLoading;
+  const activeQuery_ = tab === "archived" ? archivedQuery : activeQuery;
+  const isError = activeQuery_.isError;
   const visible = useMemo(() => sortJobs(filterJobs(rawJobs, query), sort), [rawJobs, query, sort]);
 
-  const isEmpty = !isLoading && visible.length === 0;
+  const isEmpty = !isLoading && !isError && visible.length === 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -144,7 +152,24 @@ const Jobs = () => {
         </div>
 
         {isLoading ? (
-          <div className="text-muted-foreground text-sm py-8">Loading jobs...</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-border bg-card p-5 space-y-4">
+                <Skeleton className="w-12 h-12 rounded-xl" />
+                <div className="space-y-2">
+                  <Skeleton className="h-5 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+                <Skeleton className="h-6 w-28 rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : isError ? (
+          <ErrorState
+            headline="Couldn't load your jobs"
+            body="Check your connection and try again."
+            onRetry={() => activeQuery_.refetch()}
+          />
         ) : isEmpty && !query ? (
           tab === "archived" ? (
             <EmptyState

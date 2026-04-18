@@ -25,7 +25,7 @@ export function useToggleContactSelection(jobId: string) {
       if (msg.includes("Selection cap") || msg.includes("400")) {
         toast.error("You can only select 3 contacts");
       } else {
-        toast.error("Could not update selection");
+        toast.error("Couldn't update that. Try again?");
       }
     },
     onSettled: () => {

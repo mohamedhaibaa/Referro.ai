@@ -7,6 +7,7 @@ import { Contact, Job } from "@/types/job";
 import { patchContact, setContactRepliedAt } from "@/lib/api/contacts";
 import { useContactOutreach, useDeleteOutreach, useUpdateOutreach } from "@/hooks/useOutreach";
 import { STATES, isPostReplyState, statusLabel } from "@/lib/contactLifecycle";
+import { Skeleton } from "@/components/ui/skeleton";
 import StateTimeline from "./StateTimeline";
 import MessageDraftView from "./MessageDraftView";
 import PostReplyView from "./PostReplyView";
@@ -22,7 +23,7 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
   const qc = useQueryClient();
   const [imgFailed, setImgFailed] = useState(false);
 
-  const { data: messages = [] } = useContactOutreach(job.id, contact?.id ?? "", !!contact);
+  const { data: messages = [], isLoading: messagesLoading } = useContactOutreach(job.id, contact?.id ?? "", !!contact);
   const updateOutreach = useUpdateOutreach(job.id, contact?.id ?? "");
   const deleteOutreach = useDeleteOutreach(job.id, contact?.id ?? "");
 
@@ -33,9 +34,8 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
       qc.invalidateQueries({ queryKey: ["contacts", job.id] });
       qc.invalidateQueries({ queryKey: ["outreach", job.id, contact?.id] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not update contact";
-      toast.error(msg);
+    onError: () => {
+      toast.error("Couldn't save that change. Try again?");
     },
   });
 
@@ -52,9 +52,8 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["contacts", job.id] });
     },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not update contact";
-      toast.error(msg);
+    onError: () => {
+      toast.error("Couldn't undo. Try again?");
     },
   });
 
@@ -197,7 +196,16 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
           </div>
 
           <div className="p-6 max-h-[60vh] overflow-y-auto">
-            {isPostReplyState(status) ? (
+            {messagesLoading && messages.length === 0 ? (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-24 w-full rounded-xl" />
+                <div className="flex gap-2 pt-2">
+                  <Skeleton className="h-9 w-24 rounded-full" />
+                  <Skeleton className="h-9 w-32 rounded-full" />
+                </div>
+              </div>
+            ) : isPostReplyState(status) ? (
               <PostReplyView
                 job={job}
                 contact={contact}

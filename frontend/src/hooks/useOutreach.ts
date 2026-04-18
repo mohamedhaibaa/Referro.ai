@@ -27,9 +27,8 @@ export function useCreateOutreach(jobId: string, contactId: string) {
     mutationFn: ({ type, message, isAiGenerated }: { type: OutreachType; message: string; isAiGenerated?: boolean }) =>
       createOutreach(jobId, contactId, type, message, isAiGenerated ?? false),
     onSuccess: () => invalidate(qc, jobId, contactId),
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not create draft";
-      toast.error(msg);
+    onError: () => {
+      toast.error("Couldn't save your draft. Try again?");
     },
   });
 }
@@ -42,9 +41,8 @@ export function useUpdateOutreach(jobId: string, contactId: string) {
       patch: { message?: string; sent_at?: string | null };
     }) => updateOutreach(jobId, outreachId, patch),
     onSuccess: () => invalidate(qc, jobId, contactId),
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not update message";
-      toast.error(msg);
+    onError: () => {
+      toast.error("Couldn't save that change. Try again?");
     },
   });
 }
@@ -54,9 +52,8 @@ export function useDeleteOutreach(jobId: string, contactId: string) {
   return useMutation({
     mutationFn: (outreachId: string) => deleteOutreach(jobId, outreachId),
     onSuccess: () => invalidate(qc, jobId, contactId),
-    onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Could not delete message";
-      toast.error(msg);
+    onError: () => {
+      toast.error("Couldn't delete that message.");
     },
   });
 }

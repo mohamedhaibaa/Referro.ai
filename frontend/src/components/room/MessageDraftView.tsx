@@ -123,7 +123,7 @@ const MessageDraftView = ({ job, contact, messages, onMarkReplied, onUndo }: Mes
       await navigator.clipboard.writeText(draftText || currentDraft?.message || "");
       toast.success("Copied to clipboard");
     } catch {
-      toast.error("Could not copy");
+      toast.error("Couldn't copy to clipboard.");
     }
   };
 

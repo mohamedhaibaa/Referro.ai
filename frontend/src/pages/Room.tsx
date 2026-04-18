@@ -1,9 +1,11 @@
 import { useParams } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import PickContactsPanel from "@/components/room/PickContactsPanel";
 import Phase2Panel from "@/components/room/Phase2Panel";
+import ErrorState from "@/components/ui/ErrorState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useJob, useJobMilestones, useUpdateMilestones } from "@/hooks/useJobs";
 import { getStagePill, TONE_CLASSES } from "@/lib/jobStagePill";
 
@@ -11,12 +13,15 @@ const Room = () => {
   const { id } = useParams<{ id: string }>();
   const jobId = id ?? "";
 
-  const { data: job, isLoading: jobLoading } = useJob(jobId);
-  const { data: milestones, isLoading: milestonesLoading } = useJobMilestones(jobId);
+  const jobQuery = useJob(jobId);
+  const milestonesQuery = useJobMilestones(jobId);
+  const job = jobQuery.data;
+  const milestones = milestonesQuery.data;
   const updateMilestones = useUpdateMilestones(jobId);
   const [confirming, setConfirming] = useState(false);
 
-  const loading = jobLoading || milestonesLoading;
+  const loading = jobQuery.isLoading || milestonesQuery.isLoading;
+  const isError = jobQuery.isError;
 
   const handleConfirm = () => {
     setConfirming(true);
@@ -29,7 +34,19 @@ const Room = () => {
   };
 
   if (loading) {
-    return <Shell><CenteredSpinner /></Shell>;
+    return <Shell><RoomSkeleton /></Shell>;
+  }
+
+  if (isError) {
+    return (
+      <Shell>
+        <ErrorState
+          headline="Couldn't load this job"
+          body="Check your connection and try again."
+          onRetry={() => jobQuery.refetch()}
+        />
+      </Shell>
+    );
   }
 
   if (!job) {
@@ -89,10 +106,34 @@ const Shell = ({ children }: { children: React.ReactNode }) => (
   </div>
 );
 
-const CenteredSpinner = () => (
-  <div className="flex items-center justify-center py-20">
-    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-  </div>
+const RoomSkeleton = () => (
+  <>
+    <div className="mb-8 space-y-3">
+      <Skeleton className="h-4 w-24" />
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-80" />
+        <Skeleton className="h-6 w-28 rounded-full" />
+      </div>
+      <Skeleton className="h-5 w-40" />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="rounded-2xl border border-border bg-card p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <Skeleton className="w-12 h-12 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-5 w-16 rounded-full" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
 );
 
 export default Room;
