@@ -292,3 +292,21 @@ class WorkflowRun(Base):
         Index("workflow_runs_user_id_idx", "user_id"),
         Index("workflow_runs_status_idx", "status"),
     )
+
+
+class RefChatMessage(Base):
+    __tablename__ = "ref_chat_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("contacts.id", ondelete="CASCADE"), nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    role: Mapped[str] = mapped_column(String(10), nullable=False)
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    content: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    __table_args__ = (
+        Index("ref_chat_messages_contact_id_idx", "contact_id", "created_at"),
+    )

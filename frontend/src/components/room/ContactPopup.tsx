@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import StateTimeline from "./StateTimeline";
 import MessageDraftView from "./MessageDraftView";
 import PostReplyView from "./PostReplyView";
+import RefChatPanel from "./RefChatPanel";
 
 interface ContactPopupProps {
   job: Job;
@@ -205,6 +206,18 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
                   <Skeleton className="h-9 w-32 rounded-full" />
                 </div>
               </div>
+            ) : status === STATES.NOT_CONTACTED || status === STATES.DRAFTED ? (
+              // REF-13: chat-driven flow for not_contacted + drafted only.
+              // Other states (sent, followup_*, replied, *_completed, outcome_*)
+              // continue through the existing button-based UIs below until
+              // they're migrated in REF-14+.
+              <RefChatPanel
+                job={job}
+                contact={contact}
+                onTransitionToSent={() =>
+                  qc.invalidateQueries({ queryKey: ["contacts", job.id] })
+                }
+              />
             ) : isPostReplyState(status) ? (
               <PostReplyView
                 job={job}
