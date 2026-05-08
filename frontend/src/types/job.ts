@@ -25,6 +25,7 @@ export interface Job {
   fitScore?: FitScore;
   workMode?: WorkMode;
   roleFamily?: RoleFamily;
+  contactStatuses?: string[];
   hasSelectedContact: boolean;
   hasOutreachDraft: boolean;
   outreachMarkedSent: boolean;
@@ -48,6 +49,7 @@ export interface Job {
   tags?: string[];
   outcome?: "Offer" | "Rejected" | "Withdrew" | "No response";
   activityTimeline?: ActivityItem[];
+  workflowRunId?: string | null;
 }
 
 export interface Contact {
@@ -57,6 +59,7 @@ export interface Contact {
   company: string;
   location: string;
   linkedinUrl?: string;
+  photoUrl?: string | null;
   university?: string;
   tenureMonths?: number;
   relevanceScore?: number;
@@ -65,6 +68,15 @@ export interface Contact {
   source: string;
   batchNumber?: number;
   roundNumber?: number;
+  isSelected?: boolean;
+  lifecycleStatus?: string;
+  repliedAt?: string | null;
+  coffeeChatScheduledAt?: string | null;
+  coffeeChatCompletedAt?: string | null;
+  interviewScheduledAt?: string | null;
+  interviewCompletedAt?: string | null;
+  outcome?: string | null;
+  outcomeRecordedAt?: string | null;
   createdAt?: string;
 }
 
@@ -74,11 +86,17 @@ export interface UserCredits {
   planTier: string;
 }
 
+export type OutreachType = "initial" | "followup_1" | "followup_2";
+
 export interface OutreachMessage {
   id: string;
+  jobId?: string;
+  contactId?: string;
   message: string;
-  sentAt?: string;
-  type: "initial" | "followup";
+  sentAt?: string | null;
+  type: OutreachType;
+  isAiGenerated?: boolean;
+  createdAt?: string;
 }
 
 export interface FollowUp {

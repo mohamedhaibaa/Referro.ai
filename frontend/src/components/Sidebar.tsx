@@ -1,4 +1,4 @@
-import { Home, Inbox, Briefcase, FileText, Settings, LogOut, Headphones, Zap } from "lucide-react";
+import { Home, LayoutDashboard, Inbox, Briefcase, FileText, Settings, LogOut, Headphones, Zap } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useCredits } from "@/hooks/useCredits";
 
@@ -8,6 +8,7 @@ const Sidebar = () => {
   
   const navItems = [
     { icon: Home, label: "Home", to: "/" },
+    { icon: LayoutDashboard, label: "Dashboard", to: "/dashboard" },
     { icon: Inbox, label: "Inbox", to: "/inbox" },
     { icon: Briefcase, label: "Jobs", to: "/jobs" },
     { icon: FileText, label: "Resume", to: "/resume" },

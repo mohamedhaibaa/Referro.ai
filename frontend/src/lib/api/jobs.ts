@@ -16,6 +16,8 @@ interface ApiJob {
   progress: number;
   createdAt: string;
   updatedAt: string;
+  workflowRunId?: string | null;
+  contactStatuses?: string[];
 }
 
 function toJob(j: ApiJob): Job {
@@ -47,6 +49,8 @@ function toJob(j: ApiJob): Job {
       interviewPrep3: false,
       outcomeRecorded: false,
     },
+    workflowRunId: j.workflowRunId ?? null,
+    contactStatuses: j.contactStatuses ?? [],
   };
 }
 
@@ -63,6 +67,11 @@ interface SingleJobResponse {
 
 export async function listJobs(): Promise<Job[]> {
   const res = await api.get<ListJobsResponse>("/jobs");
+  return res.data.map(toJob);
+}
+
+export async function listArchivedJobs(): Promise<Job[]> {
+  const res = await api.get<ListJobsResponse>("/jobs?archived=true");
   return res.data.map(toJob);
 }
 
@@ -94,6 +103,11 @@ export async function deleteJob(id: string): Promise<void> {
   await api.delete(`/jobs/${id}`);
 }
 
+export async function restoreJob(id: string): Promise<Job> {
+  const res = await api.post<SingleJobResponse>(`/jobs/${id}/restore`, {});
+  return toJob(res.data);
+}
+
 export interface Milestones {
   resumeTailored: boolean;
   contactSelected: boolean;
@@ -117,7 +131,26 @@ export async function getMilestones(jobId: string): Promise<Milestones> {
   return res.data;
 }
 
+const MILESTONE_TO_SNAKE: Record<keyof Milestones, string> = {
+  resumeTailored: "resume_tailored",
+  contactSelected: "contact_selected",
+  outreachSent: "outreach_sent",
+  followUpSent: "follow_up_sent",
+  replyReceived: "reply_received",
+  interviewScheduled: "interview_scheduled",
+  interviewPrep1: "interview_prep_1",
+  interviewPrep2: "interview_prep_2",
+  interviewPrep3: "interview_prep_3",
+  outcomeRecorded: "outcome_recorded",
+};
+
 export async function updateMilestones(jobId: string, patch: Partial<Milestones>): Promise<Milestones> {
-  const res = await api.patch<MilestonesResponse>(`/jobs/${jobId}/milestones`, patch);
+  const body: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    const snake = MILESTONE_TO_SNAKE[k as keyof Milestones];
+    if (snake) body[snake] = v as boolean;
+  }
+  const res = await api.patch<MilestonesResponse>(`/jobs/${jobId}/milestones`, body);
   return res.data;
 }

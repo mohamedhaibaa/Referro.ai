@@ -51,3 +51,51 @@ export async function revisitContacts(
   const res = await api.post<RevisitResponse>(`/jobs/${jobId}/contacts/revisit`, {});
   return res.data;
 }
+
+interface PatchContactResponse {
+  data: Contact;
+  meta: Record<string, unknown>;
+  error: string | null;
+}
+
+export async function setContactSelected(
+  jobId: string,
+  contactId: string,
+  isSelected: boolean
+): Promise<Contact> {
+  const res = await api.patch<PatchContactResponse>(
+    `/jobs/${jobId}/contacts/${contactId}`,
+    { is_selected: isSelected }
+  );
+  return res.data;
+}
+
+export async function setContactRepliedAt(
+  jobId: string,
+  contactId: string,
+  repliedAt: string | null
+): Promise<Contact> {
+  const res = await api.patch<PatchContactResponse>(
+    `/jobs/${jobId}/contacts/${contactId}`,
+    { replied_at: repliedAt }
+  );
+  return res.data;
+}
+
+export async function patchContact(
+  jobId: string,
+  contactId: string,
+  patch: {
+    coffee_chat_scheduled_at?: string | null;
+    coffee_chat_completed_at?: string | null;
+    interview_scheduled_at?: string | null;
+    interview_completed_at?: string | null;
+    outcome?: string | null;
+  }
+): Promise<Contact> {
+  const res = await api.patch<PatchContactResponse>(
+    `/jobs/${jobId}/contacts/${contactId}`,
+    patch
+  );
+  return res.data;
+}
