@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, jobs, contacts, outreach, follow_up, flash_cards, pitch_deck, attachments, dashboard, inbox, notes, activity, workflow_runs, credits
+from app.api.v1 import auth, jobs, contacts, outreach, follow_up, flash_cards, pitch_deck, attachments, dashboard, inbox, notes, activity, workflow_runs, credits, ref_chat
 
 router = APIRouter()
 
@@ -17,3 +17,4 @@ router.include_router(notes.router, prefix="/jobs", tags=["notes"])
 router.include_router(activity.router, prefix="/jobs", tags=["activity"])
 router.include_router(workflow_runs.router, prefix="/workflow-runs", tags=["workflow-runs"])
 router.include_router(credits.router, prefix="/credits", tags=["credits"])
+router.include_router(ref_chat.router, prefix="/jobs", tags=["ref-chat"])
