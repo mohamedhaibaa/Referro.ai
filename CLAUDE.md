@@ -227,9 +227,9 @@ Spec, decisions, file diffs: [`/docs/modifications/REF-13.md`](./docs/modificati
 | Why a specific UX choice was made | [`/docs/UX_FLOW.md`](./docs/UX_FLOW.md) |
 | Service Bus payload schemas | [`/docs/MESSAGE_SCHEMAS.md`](./docs/MESSAGE_SCHEMAS.md) |
 | Async job lifecycle | [`/docs/WORKFLOW_LIFECYCLE.md`](./docs/WORKFLOW_LIFECYCLE.md) |
-| Older project docs (supplementary) | `CONTEXT.md`, `SKILLS.md`, `MEMORY.md`, `AGENT.md`, `PROJECT_KNOWLEDGE.md` |
-
-The "supplementary" four were authoritative pre-DD-workflow but predate Stages 1-7C and REF-13. Some of their content is stale. The audit + UX_FLOW + this file are now the working set; treat the supplementary docs as background reading, not gospel.
+| Operational lessons learned | [`/docs/lessons.md`](./docs/lessons.md) |
+| Per-ticket teach-backs | [`/docs/learnings/`](./docs/learnings/) |
+| Blob-storage path convention (aspirational, when implemented) | [`/docs/BLOB_PATHS.md`](./docs/BLOB_PATHS.md) |
 
 ---
 

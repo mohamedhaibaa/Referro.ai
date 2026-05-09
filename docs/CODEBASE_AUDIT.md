@@ -124,38 +124,27 @@
 
 ## 3. Repository structure
 
+> Note: this section was written before REF-19 cleaned up the `/docs/` tree. The directory snapshot below reflects the post-REF-19 state. (Pre-REF-19 there were 18 additional `.md` files at the repo root and under `/docs/` that have since been deleted as stale.)
+
 ```
 Referro.ai/
 ├── CLAUDE.md                        # Master project rules — read first
-├── CONTEXT.md                       # Phase status / what exists / gaps
-├── MEMORY.md                        # Decisions + gotchas + lessons
-├── AGENT.md                         # Process Claude/contributor follows
-├── SKILLS.md                        # Pattern library (~17k lines, copy-paste)
-├── COFOUNDER_GUIDE (1).md           # Onboarding doc explaining the 5-file system
-├── PROJECT_KNOWLEDGE.md             # 99k-line comprehensive reference
-├── README.md
-├── INTERVIEW_BRIEF.md               # untracked, present in working tree
+├── RUNBOOK.md                       # Cold-start env + commands guide
+├── README.md                        # Thin pointer to the canonical doc set
 ├── Makefile                         # frontend / backend / worker / migrate / install
 ├── docker-compose.local.yml         # postgres:16 on port 5433
 ├── .env.example                     # canonical env vars list
 ├── .github/                         # workflow stubs
 ├── landing/                         # separate Vercel landing site
 ├── docs/
-│   ├── API_SPEC.md, API_GUIDE.md
-│   ├── DATABASE_SCHEMA.md           # tables + columns reference (older)
-│   ├── BACKEND_HANDOVER.md          # deepest backend doc (~1.2k lines)
-│   ├── FOUNDATION_PACK.md           # foundational components
-│   ├── EXECUTION_PLAN.md            # 6-week build plan
-│   ├── JOB_CARD_FLOW.md             # job-detail page deep dive (older flow)
-│   ├── WEBSITE_BLUEPRINT.md         # frontend wireframes
+│   ├── CODEBASE_AUDIT.md            # this file — deep dive
+│   ├── UX_FLOW.md                   # design rationale per moment
+│   ├── SESSION_LOG.md               # append-only session log
 │   ├── WORKFLOW_LIFECYCLE.md        # async job state diagram
 │   ├── MESSAGE_SCHEMAS.md           # SB queue payloads
 │   ├── BLOB_PATHS.md                # blob storage path conventions
-│   ├── ENVIRONMENT_SETUP.md
-│   ├── GIT_WORKFLOW.md              # branch model, PR rules, commit format
-│   ├── TECH_STACK.md
-│   ├── How to Use Swagger UI for Development.md
 │   ├── lessons.md                   # brief append-only learnings log
+│   ├── modifications/               # per-ticket records (REF-13.md, etc.)
 │   └── learnings/
 │       ├── ref12-contact-discovery.md
 │       └── ref-pricing-cost-optimization.md
@@ -1145,7 +1134,7 @@ The `lost_touch` rename happened in migration `k1l2m3n4o5p6` (data migration, no
 ## 11. Tech debt and known issues
 
 ### TypeScript / linting
-- **Strict mode is OFF.** `tsconfig.app.json`: `strict: false`, `noImplicitAny: false`, `strictNullChecks: false`, `noUnusedLocals: false`, `noUnusedParameters: false`. Tracked in MEMORY.md as a Phase 4 TODO.
+- **Strict mode is OFF.** `tsconfig.app.json`: `strict: false`, `noImplicitAny: false`, `strictNullChecks: false`, `noUnusedLocals: false`, `noUnusedParameters: false`. Tracked as a future polish-phase TODO.
 - ESLint config at `frontend/eslint.config.js` disables `@typescript-eslint/no-unused-vars` entirely. So unused variables compile and lint clean.
 - I did not run `npm run lint && npx tsc --noEmit` so I cannot give a current warning count.
 
@@ -1191,7 +1180,7 @@ The `lost_touch` rename happened in migration `k1l2m3n4o5p6` (data migration, no
 ### Architectural inconsistencies
 - **The legacy and new flows share data, not UI.** Both query the same React Query caches, both operate on the same DB rows. But the legacy `JobDetail` uses `KanbanCard`/`OutreachBuilder`/`FollowUpScheduler` (mostly stubbed), while the new Room uses `ContactPopup`/`MessageDraftView`/`PostReplyView` (all live). Decisions made in one don't always propagate to the other (e.g. setting `is_selected` in the Room doesn't update the `JobDetail` UI's idea of "selected" — they don't share state).
 - **`Job.status` enum is stale.** It's set to `Interested` on creation and never touched again by the new flow. The stage pill is derived from contact statuses. This means, e.g., the dashboard's `byStatus` aggregation (`dashboard.py:21`) shows everything as `Interested` for users on the new flow.
-- **No `MIGRATION_WORKFLOW.md` despite CLAUDE.md / your prompt mentioning a "push-first rule with cofounder."** I checked the docs/ folder and didn't find such a file. The only relevant doc is `docs/GIT_WORKFLOW.md` which says "no direct push to main or develop" and "PR rules: every PR needs 1 approval." There's no codified push-first migration policy for the cofounder. (Worth confirming with you whether this is just unwritten team practice, or if a doc is missing.)
+- **The push-first migration rule is documented in CLAUDE.md but has no migration-specific dedicated doc.** It's an unwritten team practice promoted to written practice in CLAUDE.md §5 — no separate `MIGRATION_WORKFLOW.md` exists.
 
 ---
 
@@ -1309,11 +1298,9 @@ For a styling-only change, edit `ContactPopup.tsx` and the `Dialog` content clas
 - **Worker new consumer** → `worker/app/consumers/<name>.py` + import in `worker/app/main.py`.
 
 ### The "push-first migration rule"
-The prompt mentions this as a cofounder workflow. I didn't find it in any doc. Based on inferring from `docs/GIT_WORKFLOW.md` + the placeholder migration `a476a52207e1`, my best read is:
+Now codified in `CLAUDE.md` §5. Spelled out:
 
-> **Migrations are applied to the shared dev database before merging the code that depends on them.** If two devs are working in parallel and one merges first, the other has to rebase against the new revision. The placeholder migration exists because someone applied a change directly to the DB, then committed the empty file later to keep alembic's chain consistent — exactly the failure mode this rule prevents.
-
-If this is documented somewhere I missed, please point me to it.
+> **Migrations are applied to the shared Azure DB before merging the code that depends on them.** If two devs are working in parallel and one merges first, the other has to rebase against the new revision. The placeholder migration `a476a52207e1` exists because someone applied a change directly to the DB, then committed the empty file later to keep alembic's chain consistent — exactly the failure mode this rule prevents.
 
 ---
 
@@ -1322,13 +1309,13 @@ If this is documented somewhere I missed, please point me to it.
 - **The Room is two distinct UIs in one route.** Whether you see "Pick contacts" or "Reach out" depends entirely on `milestones.contact_selected`. I expected a more visible conditional (a step indicator, a tab, a wizard). The single boolean works but is invisible to a developer skimming the file.
 - **The lifecycle state is server-derived but stored.** I'd expect a system this disciplined to either compute on read every time, or store with strict transition validation. Instead it's stored (so you can index and filter on it) but recomputed from raw fields on every relevant write. The `_derive_lifecycle_status` cascade is short and clean — a nice middle ground.
 - **The "Referroing" overlay survives across pages.** Because the provider is at the top of the router tree and persists state to localStorage, the user can navigate away (Jobs, Inbox, Home) while the pipeline runs and the pill follows them. Closing the tab and reopening lands them on the pill (not the blur — see the load-from-storage logic that downgrades blurred → pill).
-- **The Vite dev port is 8080, not 5173.** CLAUDE.md says 5173 (the Vite default), but `vite.config.ts:10` explicitly sets `server.port = 8080`. Local dev probably uses 8080. The `CORS_ALLOWED_ORIGINS` default in `.env.example` is `http://localhost:5173`, so first-time setup may produce a "Failed to fetch" CORS error until the engineer figures it out (and indeed, `docs/lessons.md` has a section on this exact trap).
+- **The Vite dev port is 8080, not 5173.** `vite.config.ts:10` explicitly sets `server.port = 8080`. The `CORS_ALLOWED_ORIGINS` default in `.env.example` is `http://localhost:5173`, so first-time setup may produce a "Failed to fetch" CORS error until the engineer figures it out (and indeed, `docs/lessons.md` has a section on this exact trap). CLAUDE.md is now correct (post-REF-18 refresh).
 - **The chained discovery is async-of-an-async.** The job_parsing worker writes a queued workflow_run row to the DB, *then* publishes the SB message, *all from inside another consumer's processing.* This is unusual — most architectures would have the API trigger the chain. Doing it from the worker keeps the chain "cohesive" but leaves a window where the row exists but the message is in flight.
 - **Pricing cost optimization doc and code disagree.** The doc (`docs/learnings/ref-pricing-cost-optimization.md`) describes 12 profiles in one Apify call with batch_number assigned by rank. The code in `contact_discovery.py:267-273` actually uses `maxItems: 4` and increments `startPage` per batch. The current implementation pays 3 Apify calls per round, not 1. Either the doc is aspirational or the code regressed; I'd flag this for verification.
 - **Contact `is_selected` and JobMilestone `contact_selected` are separate.** Selecting a single contact toggles `contacts.is_selected`. Confirming the trio of selected contacts toggles `job_milestones.contact_selected` (boolean for the entire job). They're not redundant — the milestone flag is what flips the Room from Phase 1 to Phase 2.
 - **`outcomes` table is unused.** The model exists. The migration created it. The 1:1 unique constraint on `job_id` is in place. But no code path in the app inserts, updates, or reads this table. The "outcome" lives entirely on `contacts.outcome`. (Possibly intended for a future job-level outcome that aggregates over contacts, but currently dead.)
 - **`tags` and `job_tags` tables exist but no code uses them.** No router writes here. The `Job` type doesn't even include tags by default (it's an optional field used only in the legacy JobDetail's `NotesAttachments` component, which gets a passed prop with `[]`).
-- **`inbox_items` table exists. The inbox is generated client-side anyway.** The schema slot exists for a future server-side inbox (mentioned in CONTEXT.md as Phase 3 work). For now `lib/inboxUtils.ts` re-derives the action list from the jobs array on every render.
+- **`inbox_items` table exists. The inbox is generated client-side anyway.** The schema slot exists for a future server-side inbox. For now `lib/inboxUtils.ts` re-derives the action list from the jobs array on every render.
 - **The `DELETE /jobs/{id}/contacts` endpoint deletes ALL contacts for a job.** No filter. It's destructive. Not used by any frontend code path I could find. Probably leftover from early dev.
 - **Two `ActivityTimeline` components exist.** `frontend/src/components/job-detail/ActivityTimeline.tsx` (37 lines, generic activity items prop) and `frontend/src/components/room/ActivityTimeline.tsx` (123 lines, derives from contact + messages). They have nothing in common except the name. The job-detail one is used by the legacy JobDetail page; the Room one is the active version.
 - **The PostReplyView allows scheduling an interview directly from `replied`** (`canScheduleInterview` allows from both `replied` and `coffee_chat_completed`). This means a candidate who skips coffee chat goes straight from "they replied" → "interview scheduled." The state machine is "linear with skips" — coffee chat is genuinely optional, not just visually demoted.
