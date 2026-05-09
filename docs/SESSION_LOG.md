@@ -36,6 +36,45 @@ For env setup, see [`/RUNBOOK.md`](../RUNBOOK.md).
 ```
 
 ---
+## 2026-05-08 — Session 3
+
+**Branch worked on:** develop (3 PRs landed)
+**State at start:** REF-13 work in progress on feat branch, audit + UX_FLOW already drafted
+**State at end:** REF-13/REF-18/REF-19 all merged. Doc set is now 14 active .md files, all current and consistent.
+
+### What was done
+- Closed out REF-13: smoke tested 19/19 endpoints, committed, opened PR #3, squash-merged. Migration `l2m3n4o5p6q7` applied to Azure (additive, cofounder-coordinated).
+- Diagnosed photos + logos issues. Found dict-shape bug in `_extract_photo_url` (REF-14 candidate). Found logos column never populated and Room header has no `<img>` element (REF-15/16 candidates).
+- REF-18: Created `/RUNBOOK.md` (288 lines, env setup) and `/docs/SESSION_LOG.md` (this file's predecessor). Deep-refreshed `/CLAUDE.md` against live codebase. Merged via PR #4.
+- REF-19: Audited all 33 .md files in repo. Deleted 20 stale docs (-12,017 lines), rewrote README.md as thin pointer, updated CLAUDE.md §10 + 6 inline references in CODEBASE_AUDIT.md. Merged via PR #5.
+- Built personal session kit (DD_STRATEGIST_PROMPT, CLAUDE_CODE_ONBOARDING, END_OF_SESSION_RITUAL) — saved locally, not in repo.
+
+### Tickets touched
+- REF-13: SHIPPED (PR #3, commit c00d832)
+- REF-18: SHIPPED (PR #4, commit bb74410)
+- REF-19: SHIPPED (PR #5, commit 2d60e4d)
+- REF-14, REF-15, REF-16, REF-17: queued, not started
+
+### Decisions made
+- Default toward Azure DB for both user and cofounder; local Postgres documented as optional alternative.
+- `.env.azure` / `.env.local` switching pattern documented in RUNBOOK §4 — example files not yet created (separate ticket if wanted).
+- Pricing learning doc kept as aspirational despite contradicting shipped code; contradiction documented in CODEBASE_AUDIT §14.
+- INTERVIEW_BRIEF.md deleted (was at repo root); preserved in PR #2 git history if needed.
+- DOC_AUDIT.md deleted as part of REF-19 (the audit's job was done after the cleanup landed).
+
+### Loose ends for next session
+- REF-14 photos extraction fix is the obvious next ticket (small, ~30 min, high visible impact). `_extract_photo_url` in `backend/app/api/v1/contacts.py` doesn't handle dict-shape `profilePicture` returned by harvestapi.
+- REF-15 + REF-16 logos pipeline — needs cofounder coordination because of Apify cost increase per job.
+- REF-17 real Azure AI agent for chat — replaces REF-13 stub. Plug-in points marked TODO(REF-17) in `backend/app/api/v1/ref_chat.py`.
+- Production deploy pending (getreferro.ai still on old kanban).
+
+### Files changed
+- backend: `app/api/v1/ref_chat.py` (new), `app/api/v1/router.py`, `app/db/models/job.py`, `migrations/versions/l2m3n4o5p6q7_add_ref_chat_messages.py` (new)
+- frontend: `components/room/RefChatPanel.tsx` (new), `hooks/useRefChat.ts` (new), `lib/api/refChat.ts` (new), `types/refChat.ts` (new), `components/room/ContactPopup.tsx`
+- docs: `RUNBOOK.md` (new), `docs/SESSION_LOG.md` (new), `docs/modifications/README.md` (new), `docs/modifications/REF-13.md` (new), `CLAUDE.md` (rewritten), `README.md` (rewritten), `docs/CODEBASE_AUDIT.md` (6 inline fixes)
+- deleted: 20 stale .md files (see PR #5 for full list)
+
+---
 
 ## 2026-05-08 — Session 2
 
