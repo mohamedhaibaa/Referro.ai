@@ -1,8 +1,8 @@
-"""REF-13: chat-driven outreach for not_contacted and drafted lifecycle states.
+"""REF-13 + REF-17: chat-driven outreach with AI-generated drafts.
 
-Stub-driven for now. The pure state machine (`_generate_ref_response`) returns
-canned messages + side-effect descriptors. The real Azure agent plugs in here
-in REF-17 — see TODO(REF-17) markers.
+The pure state machine (`_generate_ref_response`) returns messages + side-effect
+descriptors. AI draft generation and revision happen in the handler (via
+`app.services.ref_ai`), keeping the state machine testable.
 
 Lifecycle invariant: this router does NOT directly mutate `lifecycle_status` or
 `outreach_messages.sent_at`. Instead:
@@ -23,9 +23,10 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.v1.outreach import NOT_CONTACTED, _recompute_and_persist
-from app.db.models.job import Contact, OutreachMessage, RefChatMessage
+from app.db.models.job import Contact, Job, OutreachMessage, RefChatMessage
 from app.db.models.user import User
 from app.db.session import get_db
+from app.services.ref_ai import generate_initial_draft, revise_draft
 
 router = APIRouter()
 
@@ -104,21 +105,9 @@ def _action(label: str, kind: str, primary: bool = False) -> dict:
     return {"label": label, "kind": kind, "primary": primary}
 
 
-# --- Stub draft text + intel card ---
-
-def _stub_draft(contact: Contact) -> str:
-    """Placeholder until the real Azure agent drafts.
-    TODO(REF-17): Replace with Azure agent draft-generation."""
-    first = (contact.full_name or "there").split(" ")[0]
-    company = contact.company or "the team"
-    return (
-        f"Hi {first},\n\n"
-        f"Came across your work at {company} and noticed you've been there for a while. "
-        "I'm exploring opportunities in a similar space and would love to hear how "
-        "you got into the team.\n\n"
-        "Would you be open to a quick 15-minute chat?\n\n"
-        "Thanks!"
-    )
+# --- Intel card ---
+# _stub_draft removed in REF-17 — draft generation now handled by
+# app.services.ref_ai.generate_initial_draft, called from the handler.
 
 
 def _intel_card_content(contact: Contact) -> dict:
@@ -157,12 +146,16 @@ def _generate_ref_response(
     user_action: dict,
     current_state: str,
     edits_left_after: Optional[int],
+    ai_result: Optional[dict] = None,
 ) -> RefResponse:
     """Pure: (state, action) -> Ref's reply messages + side effects.
     The handler executes side effects + persists. No DB calls in this function.
 
     `edits_left_after` is "edits remaining AFTER this incoming user text edit",
     not before. The caller computes this by counting prior user text rows.
+
+    `ai_result` is the parsed AI response dict (keys: chat, draft, play)
+    pre-computed by the handler for branches that need AI generation.
     """
     first = (contact.full_name or "there").split(" ")[0]
     kind = user_action.get("kind")
@@ -186,30 +179,33 @@ def _generate_ref_response(
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
                 "content": {"actions": [
-                    _action("🎉 She accepted! (simulate)", ACTION_SHE_ACCEPTED, primary=True),
+                    _action("🎉 They accepted! (simulate)", ACTION_SHE_ACCEPTED, primary=True),
                 ]},
             },
         ])
 
     if current_state == NOT_CONTACTED and kind == "action" and action == ACTION_SHE_ACCEPTED:
-        stub = _stub_draft(contact)
-        # TODO(REF-17): Replace stub draft with Azure agent draft-generation.
+        # ai_result is pre-computed by the handler via generate_initial_draft.
+        ai = ai_result or {}
+        draft_text = ai.get("draft", "")
+        chat_text = ai.get("chat", (
+            "Let's go. Time to send the outreach. Here's what "
+            "I'd open with, tell me what to tweak, or hit \"Looks "
+            "fire\" if it's good."
+        ))
+        play = ai.get("play")
+        if play:
+            chat_text = f"Pattern: **{play}**. {chat_text}"
         return RefResponse(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {
-                        "text": (
-                            "Let's go. Time to send the actual outreach. Here's what "
-                            "I'd open with — tell me what to tweak, or hit \"Looks "
-                            "fire 🔥\" if it's good."
-                        ),
-                    },
+                    "content": {"text": chat_text},
                 },
                 {
                     "role": ROLE_REF, "kind": KIND_DRAFT,
                     "content": {
-                        "text": stub,
+                        "text": draft_text,
                         "edits_left": DRAFT_EDITS_INITIAL,
                         "show_counter": True,
                     },
@@ -222,27 +218,22 @@ def _generate_ref_response(
                     ]},
                 },
             ],
-            side_effects=[CreateInitialOutreach(text=stub)],
+            side_effects=[CreateInitialOutreach(text=draft_text)],
         )
 
     # State: drafted ----------------------------------------------------------
 
     if current_state == DRAFTED and kind == "text":
-        new_user_text = (content.get("text") or "").strip()
-        # Stub revision — trivially derive a revised draft from the user's instruction.
-        # Real agent will rewrite the existing draft per the instruction.
-        # TODO(REF-17): Replace with Azure agent revision.
-        version = (DRAFT_EDITS_INITIAL - max(0, edits_left_after or 0))
-        revised = new_user_text + f"  [v{version}]"
+        # ai_result is pre-computed by the handler via revise_draft.
+        ai = ai_result or {}
+        revised = ai.get("draft", (content.get("text") or "").strip())
+        chat_text = ai.get("chat", "Tightened it up.")
 
         left = max(0, edits_left_after or 0)
         if left > 0:
-            tip = (
-                f"Tightened it up 🎯 {left} edit{'s' if left != 1 else ''} left "
-                "— or hit \"Looks fire 🔥\" when ready."
-            )
+            chat_text += f" {left} edit{'s' if left != 1 else ''} left, or hit \"Looks fire\" when ready."
         else:
-            tip = "Tightened it up 🎯 No more edits — \"Looks fire 🔥\" when you're ready."
+            chat_text += " No more edits, hit \"Looks fire\" when you're ready."
 
         actions = [_action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True)]
         if left > 0:
@@ -250,7 +241,7 @@ def _generate_ref_response(
 
         return RefResponse(
             messages=[
-                {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": tip}},
+                {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": chat_text}},
                 {
                     "role": ROLE_REF, "kind": KIND_DRAFT,
                     "content": {
@@ -292,7 +283,7 @@ def _generate_ref_response(
                 "content": {
                     "text": (
                         f"Sent! 📤 The ball's in {first}'s court now. I'll check "
-                        "back when she replies."
+                        "back when they reply."
                     ),
                 },
             }],
@@ -304,6 +295,17 @@ def _generate_ref_response(
 
 
 # --- DB helpers ---
+
+def _load_job_owned(job_id: str, user: User, db: Session) -> Job:
+    job = (
+        db.query(Job)
+        .filter(Job.id == uuid.UUID(job_id), Job.user_id == user.id, Job.is_deleted == False)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
 
 def _load_contact_owned(job_id: str, contact_id: str, user: User, db: Session) -> Contact:
     contact = (
@@ -577,6 +579,37 @@ def post_chat(
         edits_left_after = DRAFT_EDITS_INITIAL - prior_edits - 1
         # body.edits_left is a hint; if it disagrees we trust the server count.
 
+    # --- AI generation (before persist, so we don't commit on AI failure) ---
+    ai_result: Optional[dict] = None
+    req_action = content.get("action") if kind == "action" else None
+
+    if kind == "action" and req_action == ACTION_SHE_ACCEPTED:
+        job = _load_job_owned(job_id, current_user, db)
+        chat_history = (
+            db.query(RefChatMessage)
+            .filter(RefChatMessage.contact_id == contact.id, RefChatMessage.user_id == current_user.id)
+            .order_by(RefChatMessage.created_at.asc())
+            .all()
+        )
+        ai_result = generate_initial_draft(contact, job, current_user, chat_history)
+
+    elif kind == "text" and state == DRAFTED:
+        job = _load_job_owned(job_id, current_user, db)
+        chat_history = (
+            db.query(RefChatMessage)
+            .filter(RefChatMessage.contact_id == contact.id, RefChatMessage.user_id == current_user.id)
+            .order_by(RefChatMessage.created_at.asc())
+            .all()
+        )
+        existing_msg = _initial_message_for_contact(db, contact)
+        current_draft = existing_msg.message if existing_msg else ""
+        user_instruction = (content.get("text") or "").strip()
+        edit_number = DRAFT_EDITS_INITIAL - max(0, edits_left_after or 0)
+        ai_result = revise_draft(
+            contact, job, current_user, chat_history,
+            current_draft, user_instruction, edit_number,
+        )
+
     # --- Persist user message ---
     user_row = _persist_user_message(db, contact, body)
     db.flush()
@@ -587,6 +620,7 @@ def post_chat(
         user_action={"kind": kind, "content": content},
         current_state=state,
         edits_left_after=edits_left_after,
+        ai_result=ai_result,
     )
 
     # --- Apply side effects ---
@@ -598,7 +632,7 @@ def post_chat(
                 user_id=contact.user_id,
                 message=se.text,
                 type="initial",
-                is_ai_generated=False,
+                is_ai_generated=True,
             )
             db.add(new_msg)
             db.flush()

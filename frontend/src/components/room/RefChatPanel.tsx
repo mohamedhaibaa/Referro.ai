@@ -175,8 +175,6 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
     );
   };
 
-  const handleApprove = () => handleAction("approve_draft");
-
   // --- Render ---
 
   if (chatLoading || (messages.length === 0 && initChat.isPending)) {
@@ -208,7 +206,7 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
             onChange={(e) => setDraftInput(e.target.value)}
             placeholder={
               editsLeft <= 0
-                ? "0 edits left — pick \"Looks fire 🔥\" to send"
+                ? "0 edits left — hit \"Looks fire 🔥\" above to send"
                 : "Tell me what to tweak…"
             }
             rows={2}
@@ -229,14 +227,6 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
             aria-label="Send"
           >
             {send.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={handleApprove}
-            disabled={send.isPending}
-            className="px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
-          >
-            Looks fire 🔥
           </button>
         </div>
       )}
@@ -310,7 +300,7 @@ const UserBubble = ({ text }: { text: string }) => (
 
 const ACTION_LABELS: Record<string, string> = {
   sent_connection_request: "Sent connection request",
-  she_accepted: "She accepted",
+  she_accepted: "They accepted",
   approve_draft: "Approved",
   mark_sent: "Marked sent",
 };
