@@ -23,7 +23,7 @@ export function useToggleContactSelection(jobId: string) {
       if (ctx?.previous) qc.setQueryData(["contacts", jobId], ctx.previous);
       const msg = (err as { message?: string })?.message ?? "";
       if (msg.includes("Selection cap") || msg.includes("400")) {
-        toast.error("You can only select 3 contacts");
+        toast.error("You can only select up to 9 contacts");
       } else {
         toast.error("Couldn't update that. Try again?");
       }

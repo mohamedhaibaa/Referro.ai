@@ -1,6 +1,7 @@
 from fastapi import APIRouter, status, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models.job import Job, JobMilestone, Contact
@@ -270,6 +271,18 @@ def update_milestones(
     ).first()
     if not milestone:
         raise HTTPException(status_code=404, detail="Milestones not found")
+
+    if body.contact_selected is True:
+        selected_count = db.query(func.count(Contact.id)).filter(
+            Contact.job_id == job_id,
+            Contact.user_id == current_user.id,
+            Contact.is_selected == True,  # noqa: E712
+        ).scalar() or 0
+        if selected_count < 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Select at least one contact before confirming.",
+            )
 
     for field, value in body.model_dump(exclude_none=True).items():
         setattr(milestone, field, value)

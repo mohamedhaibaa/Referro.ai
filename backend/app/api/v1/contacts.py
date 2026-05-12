@@ -13,7 +13,7 @@ from app.db.models.credit import CreditTransaction, CAMPAIGN, REVISIT
 from app.api.deps import get_current_user
 from app.services import queue
 
-SELECTION_CAP = 3
+SELECTION_CAP = 9
 _PHOTO_KEYS = (
     "photo", "photoUrl", "profilePictureUrl", "pictureUrl",
     "avatarUrl", "picture", "profilePicture", "profile_picture_url",
@@ -183,6 +183,8 @@ def discover_contacts(
     }
 
 
+# NOTE: REF-20 removed the UI caller ("Find 9 more"). Endpoint is orphaned
+# but preserved pending a separate cleanup ticket.
 @router.post("/{job_id}/contacts/revisit", status_code=status.HTTP_202_ACCEPTED)
 def revisit_contacts(
     job_id: str,
