@@ -160,8 +160,8 @@ because there is no API path to detect real LinkedIn acceptance.
 
 ### Issue 3 — Edit/Revision UX
 
-**Status**: Not started
-**Ticket**: (none yet)
+**Status**: Shipped
+**Ticket**: REF-21
 **Estimated complexity**: XS (cosmetic) → S (if anything semantic changes)
 **Dependencies**: none
 
@@ -208,12 +208,16 @@ None.
 
 #### Ticket breakdown
 
-- REF-XX (TBD): "Reshape draft editor as inline chat composer; remove
-  no-op Edit button" — XS-S.
+- REF-21: "Reshape draft editor as inline chat composer; remove no-op
+  Edit button" — XS-S. Shipped.
 
 #### Updates
 
-(Empty.)
+2026-05-12 — REF-21 shipped (commit `<merge-sha>`, PR #N): pinned
+composer to bottom of chat, edits-left counter relocated to composer
+area, "📝 Edit" no-op button removed from state machine + type union,
+Enter sends / Shift+Enter newline. Composer hidden in `not_contacted`
+and post-approve states. No backend or AI logic changes.
 
 ---
 
@@ -444,3 +448,5 @@ M-L ticket outside this roadmap.
 ## Changelog
 
 2026-05-12 — Roadmap created.
+2026-05-12 — REF-21 shipped (Issue 3): pinned chat composer, removed
+no-op Edit button, relocated edits counter to composer.

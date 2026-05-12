@@ -104,8 +104,8 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   const editorDisabled = !editorVisible || editsLeft <= 0 || send.isPending;
 
   // --- Action dispatcher ---
-  // Handles client-only buttons (copy / open_linkedin / edit_draft) inline,
-  // routes server-bound buttons through useSendRefChat. The "Mark sent" branch
+  // Handles client-only buttons (copy / open_linkedin) inline, routes
+  // server-bound buttons through useSendRefChat. The "Mark sent" branch
   // chains useUpdateOutreach to PATCH sent_at — the canonical lifecycle path.
   const handleAction = (actionKind: string) => {
     if (actionKind === "copy") {
@@ -124,10 +124,6 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
       if (contact.linkedinUrl) {
         window.open(contact.linkedinUrl, "_blank", "noopener,noreferrer");
       }
-      return;
-    }
-    if (actionKind === "edit_draft") {
-      // Editor is already visible in drafted state. No-op.
       return;
     }
 
@@ -200,34 +196,39 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
       </div>
 
       {editorVisible && (
-        <div className="border-t border-border pt-3 mt-3 flex items-end gap-2">
-          <Textarea
-            value={draftInput}
-            onChange={(e) => setDraftInput(e.target.value)}
-            placeholder={
-              editsLeft <= 0
-                ? "0 edits left — hit \"Looks fire 🔥\" above to send"
-                : "Tell me what to tweak…"
-            }
-            rows={2}
-            disabled={editorDisabled}
-            className="resize-none text-sm flex-1"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                handleSendDraft();
+        <div className="border-t border-border pt-3 mt-3 space-y-1.5">
+          <p className="text-[11px] text-muted-foreground px-1">
+            {editsLeft} {editsLeft === 1 ? "edit" : "edits"} left
+          </p>
+          <div className="flex items-end gap-2">
+            <Textarea
+              value={draftInput}
+              onChange={(e) => setDraftInput(e.target.value)}
+              placeholder={
+                editsLeft <= 0
+                  ? "0 edits left — hit Looks fire 🔥 to send"
+                  : "Tell me what to tweak…"
               }
-            }}
-          />
-          <button
-            type="button"
-            onClick={handleSendDraft}
-            disabled={editorDisabled || !draftInput.trim()}
-            className="p-2.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="Send"
-          >
-            {send.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          </button>
+              rows={2}
+              disabled={editorDisabled}
+              className="resize-none text-sm flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendDraft();
+                }
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSendDraft}
+              disabled={editorDisabled || !draftInput.trim()}
+              className="p-2.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label="Send"
+            >
+              {send.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -351,14 +352,8 @@ const IntelCard = ({ content }: { content: RefChatIntelContent }) => (
 
 const DraftCard = ({ content }: { content: RefChatDraftContent }) => (
   <div className="ml-9 max-w-[85%]">
-    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-2">
+    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4">
       <p className="text-sm text-foreground whitespace-pre-wrap">{content.text}</p>
-      {content.show_counter && (
-        <p className="text-[11px] text-muted-foreground pt-1 border-t border-primary/20">
-          {content.edits_left}{" "}
-          {content.edits_left === 1 ? "free edit" : "free edits"} left
-        </p>
-      )}
     </div>
   </div>
 );
