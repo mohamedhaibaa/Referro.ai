@@ -34,7 +34,42 @@ For env setup, see [`/RUNBOOK.md`](../RUNBOOK.md).
 - backend/...
 - frontend/...
 ```
+## 2026-05-12 — Session 4
 
+**Branch worked on:** `develop` (REF-20 squash-merged, ROADMAP committed directly)
+**State at start:** REF-13/18/19 shipped previous session. REF-17 in flight (unknown).
+**State at end:** REF-20 shipped (PR #6, commit `ca69823`). ROADMAP.md created on develop (`6d58da3`). REF-17 also landed during this session by cofounder (commit `4f4ab78`) — no modification record filed.
+
+### What was done
+- **REF-20 shipped (PR #6, squash-merge `ca69823`).** Contact selection on `/jobs/:id/room` changed from forced-exactly-3 to allow 1–9. Regenerate now accumulates contacts in the pool (3 → 6 → 9) instead of replacing. "Find 9 more" / round-revisit UX removed. Backend `SELECTION_CAP` raised to 9; new milestone guard rejects `contactSelected: true` with 0 selected contacts. Modification record at `docs/modifications/REF-20.md`. 5 files, +169/-77.
+- **Pulled cofounder's REF-17** ("wire AI draft generation, gender-neutral UX, remove duplicate button") — commits `11eb977` + merge `4f4ab78`. 11 files, +1207/-62. Added `backend/app/services/ref_ai.py`, `backend/app/prompts/` package, design doc `docs/ref-system-prompt-v1.md`. No SESSION_LOG entry or modification record was filed by cofounder.
+- **Recon audit of 6-issue contact outreach flow.** Comprehensive read-only audit of the post-contact-selection chat flow, identifying gaps for connection requests, draft revisions, send flow, post-send navigation, reply handling, and coffee chat scheduling. Findings: Issue 3 mostly already built; Issue 5 is the choke point for Issue 6; Issue 6 is actually 3 tickets; no calendar integration exists anywhere in codebase.
+- **Created `docs/ROADMAP.md`** (commit `6d58da3`, direct to develop). 446 lines. Captures audit findings, 4-sprint sequencing, 4 open product decisions, per-issue status fields. Living document, updated as roadmap tickets ship.
+
+### Tickets touched
+- REF-20: SHIPPED (PR #6, commit `ca69823`)
+- REF-17: shipped by cofounder this session (commit `11eb977`, merge `4f4ab78`); no modification record
+- ROADMAP tickets (TBD numbering): scoped for Sprint 1 onward but not yet ticketed
+
+### Decisions made
+- Skipped manual backend probe of REF-20 milestone guard (test 8 in REF-20.md). Code-reviewed, endpoint not exercised by UI, accepted risk.
+- Roadmap doc lives at `/docs/ROADMAP.md` (single file at docs root); doc-only commits go directly to develop (SESSION_LOG-style exception).
+- Roadmap sequencing follows audit's recommendation: Sprint 1 = Issues 2 + 3, Sprint 2 = Issue 1, Sprint 3 = Issues 4 + 5, Sprint 4 = Issue 6 broken into 3 sub-tickets.
+- Issue 6c (coffee chat scheduling) scoped at "extract time + reuse picker" v1, deferring real calendar integration (would be its own L-sized ticket).
+- REF-17 missing modification record + SESSION_LOG entry not raised with cofounder this session.
+
+### Loose ends for next session
+- Resolve **PD-1 through PD-4** in ROADMAP.md before opening any roadmap ticket.
+- REF-21 likely = ROADMAP Issue 3 (edit/revision UX cosmetic cleanup).
+- Bootstrap backend pytest suite, including coverage for REF-20 milestone guard.
+- Schema cleanup ticket (future, not urgent): drop `contacts.round_number` column, delete `POST /jobs/:id/contacts/revisit` endpoint, remove orphaned `useRevisitContacts` hook + `revisitContacts` client function.
+- REF-17's missing modification record and SESSION_LOG entry — decision was to skip raising with cofounder; flag remains.
+
+### Files changed
+- backend: `app/api/v1/contacts.py` (REF-20), `app/api/v1/jobs.py` (REF-20)
+- frontend: `src/components/room/PickContactsPanel.tsx` (REF-20), `src/hooks/useContactSelection.ts` (REF-20)
+- docs: `docs/modifications/REF-20.md` (new, REF-20), `docs/ROADMAP.md` (new, doc-only commit)
+- Pulled from cofounder (REF-17): `backend/app/services/ref_ai.py` (new), `backend/app/prompts/` (new package, 4 files), `backend/app/api/v1/ref_chat.py`, `frontend/src/components/room/RefChatPanel.tsx`, `docs/ref-system-prompt-v1.md` (new)
 ---
 ## 2026-05-08 — Session 3
 
