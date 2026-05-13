@@ -119,6 +119,7 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
     if (messages.length > 0) return;
     if (
       status !== STATES.NOT_CONTACTED &&
+      status !== STATES.CONNECTED &&  // REF-28
       status !== STATES.DRAFTED &&
       status !== STATES.SENT &&
       status !== STATES.FOLLOWUP_1_DRAFTED &&
@@ -256,8 +257,21 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
       return;
     }
 
+    // REF-28: dedicated sent_connection_request branch. Opens LinkedIn
+    // profile in a new tab, then dispatches the action — server's
+    // MarkConnected side-effect PATCHes connected_at and lifecycle moves
+    // to `connected`. linkedinUrl-null contacts: skip window.open but still
+    // dispatch (state advances; user can navigate manually). Same defensive
+    // pattern as REF-23 / REF-27's send-message flow.
+    if (actionKind === "sent_connection_request") {
+      if (contact.linkedinUrl) {
+        window.open(contact.linkedinUrl, "_blank", "noopener,noreferrer");
+      }
+      send.mutate({ kind: "action", content: { action: actionKind } });
+      return;
+    }
+
     if (
-      actionKind === "sent_connection_request" ||
       actionKind === "she_accepted" ||
       actionKind === "approve_draft" ||
       actionKind === "mark_sent" ||

@@ -81,6 +81,9 @@ class Contact(Base):
     round_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_selected: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     lifecycle_status: Mapped[str] = mapped_column(String(40), nullable=False, default="not_contacted")
+    # REF-28: set when the user clicks "Send connection request" in chat.
+    # Lives between not_contacted (no signal yet) and drafted (initial OutreachMessage exists).
+    connected_at: Mapped[datetime | None] = mapped_column(nullable=True)
     replied_at: Mapped[datetime | None] = mapped_column(nullable=True)
     coffee_chat_scheduled_at: Mapped[datetime | None] = mapped_column(nullable=True)
     coffee_chat_completed_at: Mapped[datetime | None] = mapped_column(nullable=True)

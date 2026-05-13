@@ -14,6 +14,7 @@ Lifecycle invariant: this router does NOT directly mutate `lifecycle_status` or
 """
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -22,7 +23,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.v1.outreach import NOT_CONTACTED, _recompute_and_persist
+from app.api.v1.outreach import CONNECTED, NOT_CONTACTED, _recompute_and_persist
 from app.db.models.job import Contact, Job, OutreachMessage, RefChatMessage
 from app.db.models.user import User
 from app.db.session import get_db
@@ -149,12 +150,22 @@ class UndoReplied:
     pass
 
 
+@dataclass
+class MarkConnected:
+    """REF-28: PATCH contact.connected_at = now() and recompute.
+    Triggers lifecycle transition not_contacted -> connected when the user
+    clicks the connection-request button. Frontend separately opens the
+    contact's LinkedIn profile in a new tab."""
+    pass
+
+
 SideEffect = Union[
     CreateOutreach,
     UpdateCurrentDraft,
     DeleteCurrentDraft,
     UndoSent,
     UndoReplied,
+    MarkConnected,
 ]
 
 
@@ -302,28 +313,13 @@ def _generate_ref_response(
     # State: not_contacted ----------------------------------------------------
 
     if current_state == NOT_CONTACTED and kind == "action" and action == ACTION_SENT_CONNECTION:
-        # REF-25: greet the user by first name; gracefully strip the comma if
-        # User.name is empty.
-        greeting = f"Nice work, {user_first}!" if user_first else "Nice work!"
-        text = (
-            f"{greeting} Connection requests usually take a day or two — "
-            f"come back here when {first} accepts and tap the button below "
-            "to let me know."
-        )
-        return RefResponse(messages=[
-            {
-                "role": ROLE_REF, "kind": KIND_TEXT,
-                "content": {"text": text},
-            },
-            {
-                "role": ROLE_REF, "kind": KIND_ACTIONS,
-                "content": {"actions": [
-                    _action(f"✅ {first} accepted", ACTION_SHE_ACCEPTED, primary=True),
-                ]},
-            },
-        ])
+        # REF-28: side-effect-only. The chat re-renders into the CONNECTED
+        # state's init_chat seed on lifecycle update — no response messages
+        # emitted here. The frontend handler also opens the contact's
+        # LinkedIn profile in a new tab on click.
+        return RefResponse(side_effects=[MarkConnected()])
 
-    if current_state == NOT_CONTACTED and kind == "action" and action == ACTION_SHE_ACCEPTED:
+    if current_state in (NOT_CONTACTED, CONNECTED) and kind == "action" and action == ACTION_SHE_ACCEPTED:
         # ai_result is pre-computed by the handler via generate_initial_draft.
         ai = ai_result or {}
         draft_text = ai.get("draft", "")
@@ -715,6 +711,9 @@ def init_chat(
 
     state = contact.lifecycle_status or NOT_CONTACTED
     first = (contact.full_name or "there").split(" ")[0]
+    # REF-28 + DQ-9: parity with _generate_ref_response's REF-25 user_first
+    # greeting. NOT_CONTACTED and CONNECTED seeds both address the user by name.
+    user_first = (current_user.name or "").split(" ")[0]
 
     intel = {
         "role": ROLE_REF, "kind": KIND_INTEL,
@@ -722,15 +721,19 @@ def init_chat(
     }
 
     if state == NOT_CONTACTED:
+        # REF-28: button now opens LinkedIn for the user; copy adjusted away
+        # from "Drop a quick note like..." (irrelevant — they'll see LinkedIn's
+        # default flow). DQ-9: first-name greeting parity.
+        prefix = f"Hey {user_first}!" if user_first else "Alright,"
         seed = [
             intel,
             {
                 "role": ROLE_REF, "kind": KIND_TEXT,
                 "content": {
                     "text": (
-                        f"Alright, let's reach out to {first}. First step — send "
-                        "a connection request on LinkedIn. Drop a quick note like "
-                        "\"Hey, would love to connect 👋\" or just send the default."
+                        f"{prefix} let's reach out to {first}. First step — "
+                        "send a connection request on LinkedIn. Tap the button "
+                        "below and I'll open the profile for you."
                     ),
                 },
             },
@@ -738,10 +741,34 @@ def init_chat(
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
                 "content": {"actions": [
                     _action(
-                        "I sent the connection request ✅",
+                        "🔗 Send connection request",
                         ACTION_SENT_CONNECTION,
                         primary=True,
                     ),
+                ]},
+            },
+        ]
+    elif state == CONNECTED:
+        # REF-28: post-click "waiting for acceptance" seed. Reuses REF-25's
+        # user_first greeting that previously lived in _generate_ref_response's
+        # NOT_CONTACTED + ACTION_SENT_CONNECTION handler.
+        greeting = f"Nice work, {user_first}!" if user_first else "Nice work!"
+        seed = [
+            intel,
+            {
+                "role": ROLE_REF, "kind": KIND_TEXT,
+                "content": {
+                    "text": (
+                        f"{greeting} Connection request sent to {first}. "
+                        f"Come back when they accept and tap the button below "
+                        "to let me know."
+                    ),
+                },
+            },
+            {
+                "role": ROLE_REF, "kind": KIND_ACTIONS,
+                "content": {"actions": [
+                    _action(f"✅ {first} accepted", ACTION_SHE_ACCEPTED, primary=True),
                 ]},
             },
         ]
@@ -852,7 +879,8 @@ def post_chat(
         if action == ACTION_SENT_CONNECTION and state != NOT_CONTACTED:
             raise _validation_error(action, state)
         if action == ACTION_SHE_ACCEPTED:
-            if state != NOT_CONTACTED:
+            # REF-28: valid from both NOT_CONTACTED (legacy) and CONNECTED.
+            if state not in (NOT_CONTACTED, CONNECTED):
                 raise _validation_error(action, state)
             if _initial_message_for_contact(db, contact) is not None:
                 raise HTTPException(
@@ -1008,6 +1036,12 @@ def post_chat(
                 status_code=500,
                 detail="UndoReplied is reserved — no REF-22 branch emits it",
             )
+        elif isinstance(se, MarkConnected):
+            # REF-28: not_contacted -> connected. Datetime is the only state
+            # the cascade reads for this transition; no OutreachMessage is created.
+            contact.connected_at = datetime.now(timezone.utc)
+            db.flush()
+            _recompute_and_persist(contact, db)
 
     # --- Persist Ref's messages ---
     ref_rows = _persist_ref_messages(db, contact, response.messages)
