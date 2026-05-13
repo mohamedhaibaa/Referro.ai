@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-28-connected-state`
 **Status:** shipped
+**Merged:** commit `eee40ef`, PR #14
 
 ## Scope
 

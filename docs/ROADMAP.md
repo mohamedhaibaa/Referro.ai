@@ -111,7 +111,7 @@ Detail in `/docs/modifications/REF-28.md`.
 
 #### Updates
 
-2026-05-13 — REF-28 shipped (commit `<merge-sha>`, PR #N): new
+2026-05-13 — REF-28 shipped (commit `eee40ef`, PR #14): new
 `connected` lifecycle state between `not_contacted` and `drafted`,
 backed by a nullable `contacts.connected_at` column (migration
 `m3n4o5p6q7r8`, applied to Azure prod). Click "🔗 Send connection
