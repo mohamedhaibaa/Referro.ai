@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-29-connected-state-rendering-fix`
 **Status:** shipped
+**Merged:** commit `71c19ba`, PR #15
 
 ## Scope
 
