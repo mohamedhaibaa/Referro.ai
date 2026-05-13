@@ -35,20 +35,36 @@ export function useSendRefChat(jobId: string, contactId: string) {
       qc.setQueryData<RefChatMessage[]>(refChatKey(jobId, contactId), (old) =>
         [...(old ?? []), ...response.newMessages],
       );
-      // If a draft_card came back, the server just created an OutreachMessage
-      // (transition NOT_CONTACTED -> drafted). Refresh contacts + outreach so
-      // RefChatPanel sees the new initial message ID and the parent popup
-      // re-evaluates lifecycle.
+      // REF-22: also invalidate when an undo, a draft create, or a followup
+      // create comes back — these all change lifecycle state and need
+      // contacts + outreach to refresh.
       const includesDraftCreate = response.newMessages.some(
         (m) => m.role === "ref" && m.kind === "draft_card",
       );
-      if (includesDraftCreate) {
+      const includesStateChange = response.requiresFollowup === "mark_sent" ||
+        response.requiresFollowup === "mark_replied";
+      if (includesDraftCreate || includesStateChange) {
+        qc.invalidateQueries({ queryKey: ["contacts", jobId] });
+        qc.invalidateQueries({ queryKey: ["outreach", jobId, contactId] });
+      } else {
+        // Undo flows: server already mutated lifecycle (UndoSent /
+        // DeleteCurrentDraft) but didn't set requires_followup. Refresh
+        // contacts so the popup reads the rolled-back state.
         qc.invalidateQueries({ queryKey: ["contacts", jobId] });
         qc.invalidateQueries({ queryKey: ["outreach", jobId, contactId] });
       }
     },
-    onError: () => {
-      toast.error("Couldn't send. Try again?");
+    onError: (err: unknown) => {
+      // DQ-2: server emits 400 with detail "Action 'X' is not valid in
+      // state 'Y'" when the user clicks a stale historical action_buttons
+      // row. Surface a specific toast so the user understands the state
+      // moved on rather than the network failing.
+      const msg = (err as { message?: string })?.message ?? "";
+      if (msg.includes("is not valid in state")) {
+        toast.error("That button is no longer valid — the conversation has moved on. Use the latest buttons below.");
+      } else {
+        toast.error("Couldn't send. Try again?");
+      }
     },
   });
 }

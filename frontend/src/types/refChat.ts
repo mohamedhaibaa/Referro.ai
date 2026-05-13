@@ -37,6 +37,10 @@ export type RefChatActionKind =
   | "she_accepted"
   | "approve_draft"
   | "mark_sent"
+  | "they_replied"
+  | "draft_followup_1"
+  | "draft_followup_2"
+  | "undo"
   | "copy"
   | "open_linkedin";
 
@@ -55,7 +59,11 @@ export interface RefChatUserActionContent {
     | "sent_connection_request"
     | "she_accepted"
     | "approve_draft"
-    | "mark_sent";
+    | "mark_sent"
+    | "they_replied"
+    | "draft_followup_1"
+    | "draft_followup_2"
+    | "undo";
 }
 
 // A single chat message as returned by the API. content shape depends on kind;
@@ -82,5 +90,5 @@ export type PostRefChatBody =
 // Response body for POST /ref-chat
 export interface PostRefChatResponse {
   newMessages: RefChatMessage[];
-  requiresFollowup: "mark_sent" | null;
+  requiresFollowup: "mark_sent" | "mark_replied" | null;
 }

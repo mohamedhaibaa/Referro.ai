@@ -308,8 +308,8 @@ auto-detection.
 
 ### Issue 5 — Post-Send Navigation
 
-**Status**: Not started
-**Ticket**: (none yet)
+**Status**: Shipped (conservative scope; `replied` deferred — see Updates)
+**Ticket**: REF-22
 **Estimated complexity**: M
 **Dependencies**: none upstream; pre-req for Issues 6a, 6b, 6c, 6d, 6e
 
@@ -359,13 +359,27 @@ update in `ContactPopup.tsx:209`.
 
 #### Ticket breakdown
 
-- REF-XX (TBD): "Extend RefChatPanel to render past drafted (sent,
-  followup_*, replied, coffee_chat_scheduled)" — M. Could split per
-  state if scope balloons; current expectation is one ticket.
+- REF-22 (shipped): "Extend RefChatPanel past `drafted` (5 new
+  states: `sent` + `followup_1_drafted` + `followup_1_sent` +
+  `followup_2_drafted` + `followup_2_sent`)" — M, conservative
+  scope band.
+- REF-23 (TBD, future): "Bring `replied` + meeting + outcome states
+  into chat" — depends on Issue 6c's picker UX decisions.
 
 #### Updates
 
-(Empty.)
+2026-05-13 — REF-22 shipped (commit `<merge-sha>`, PR #N): chat
+covers 5 new lifecycle states (`sent`, `fu1_drafted`, `fu1_sent`,
+`fu2_drafted`, `fu2_sent`). Added actions `they_replied`,
+`draft_followup_1`, `draft_followup_2`, `undo`. Generalized
+side-effect descriptors (`CreateOutreach(type)`, `UpdateCurrentDraft`,
+`DeleteCurrentDraft`, `UndoSent`). Per-draft edit budget fix
+(counter resets at each new draft). Stale-button toast: server emits
+consistent 400 template; frontend parses and surfaces a specific
+toast. Dropped `replied` from scope per DQ-1; `replied`+ continue to
+route to PostReplyView via the natural conditional swap. No new AI
+functions (DD-B held); follow-up drafts use static stub. Issue 6
+sub-tickets now unblocked.
 
 ---
 
@@ -479,3 +493,6 @@ M-L ticket outside this roadmap.
 no-op Edit button, relocated edits counter to composer.
 2026-05-13 — PD-1, PD-2, PD-3, PD-4 resolved. See Product decisions
 section for outcomes.
+2026-05-13 — REF-22 shipped (Issue 5, conservative scope): chat
+extended to cover 5 new lifecycle states past `drafted`. Unblocks
+Issue 6.

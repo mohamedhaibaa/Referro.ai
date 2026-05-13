@@ -49,14 +49,54 @@ ACTION_SENT_CONNECTION = "sent_connection_request"
 ACTION_SHE_ACCEPTED = "she_accepted"
 ACTION_APPROVE_DRAFT = "approve_draft"
 ACTION_MARK_SENT = "mark_sent"
+ACTION_THEY_REPLIED = "they_replied"
+ACTION_DRAFT_FOLLOWUP_1 = "draft_followup_1"
+ACTION_DRAFT_FOLLOWUP_2 = "draft_followup_2"
+ACTION_UNDO = "undo"
 VALID_USER_ACTIONS = {
     ACTION_SENT_CONNECTION,
     ACTION_SHE_ACCEPTED,
     ACTION_APPROVE_DRAFT,
     ACTION_MARK_SENT,
+    ACTION_THEY_REPLIED,
+    ACTION_DRAFT_FOLLOWUP_1,
+    ACTION_DRAFT_FOLLOWUP_2,
+    ACTION_UNDO,
 }
 
+# Lifecycle state literals (mirrored from outreach._derive_lifecycle_status).
 DRAFTED = "drafted"
+SENT = "sent"
+FU1_DRAFTED = "followup_1_drafted"
+FU1_SENT = "followup_1_sent"
+FU2_DRAFTED = "followup_2_drafted"
+FU2_SENT = "followup_2_sent"
+
+DRAFT_STATES = {DRAFTED, FU1_DRAFTED, FU2_DRAFTED}
+SENT_STATES = {SENT, FU1_SENT, FU2_SENT}
+
+# Map from a *_drafted lifecycle state to the OutreachMessage.type the user is
+# editing in that state. Used by _current_draft_message_for_contact and the
+# generalized UpdateCurrentDraft/DeleteCurrentDraft/UndoSent side effects.
+_DRAFT_STATE_TO_TYPE = {
+    DRAFTED: "initial",
+    FU1_DRAFTED: "followup_1",
+    FU2_DRAFTED: "followup_2",
+}
+_SENT_STATE_TO_TYPE = {
+    SENT: "initial",
+    FU1_SENT: "followup_1",
+    FU2_SENT: "followup_2",
+}
+
+
+def _validation_error(action: str, state: str) -> HTTPException:
+    """Consistent 400-detail template — frontend's useRefChat onError parses
+    this prefix to distinguish stale-state errors from generic 400s."""
+    return HTTPException(
+        status_code=400,
+        detail=f"Action {action!r} is not valid in state {state!r}",
+    )
 
 
 # --- Request body ---
@@ -70,16 +110,52 @@ class RefChatPostRequest(BaseModel):
 # --- Side-effect descriptors (resolved by handler, not by the pure function) ---
 
 @dataclass
-class CreateInitialOutreach:
+class CreateOutreach:
+    """Insert a new OutreachMessage of the given type.
+    Used for: she_accepted (type="initial"), draft_followup_1 (type="followup_1"),
+    draft_followup_2 (type="followup_2")."""
+    type: str
     text: str
 
 
 @dataclass
-class UpdateInitialOutreach:
+class UpdateCurrentDraft:
+    """Update the body of the OutreachMessage matching the contact's current
+    drafted state. Type inferred from contact.lifecycle_status via
+    _current_draft_message_for_contact."""
     text: str
 
 
-SideEffect = Union[CreateInitialOutreach, UpdateInitialOutreach]
+@dataclass
+class DeleteCurrentDraft:
+    """Delete the OutreachMessage matching the contact's current drafted state.
+    Used by undo from fu1_drafted (deletes fu1) and fu2_drafted (deletes fu2)."""
+    pass
+
+
+@dataclass
+class UndoSent:
+    """Clear sent_at on the OutreachMessage matching the contact's current
+    sent state. Used by undo from sent / fu1_sent / fu2_sent."""
+    pass
+
+
+@dataclass
+class UndoReplied:
+    """Clear replied_at on the contact. Used by undo from replied state.
+    NOTE: replied is out of REF-22 scope; this descriptor is reserved for
+    a future ticket that brings replied into chat. Kept here so the
+    SideEffect union stays exhaustive but no code path produces it yet."""
+    pass
+
+
+SideEffect = Union[
+    CreateOutreach,
+    UpdateCurrentDraft,
+    DeleteCurrentDraft,
+    UndoSent,
+    UndoReplied,
+]
 
 
 @dataclass
@@ -139,6 +215,57 @@ def _intel_card_content(contact: Contact) -> dict:
     return {"title": title, "items": items}
 
 
+# --- Action button presets (used by both _generate_ref_response and init_chat) ---
+
+def _approve_buttons(include_undo: bool) -> dict:
+    """Action buttons rendered alongside a draft_card (drafted / fu*_drafted)."""
+    actions = [_action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True)]
+    if include_undo:
+        actions.append(_action("↩ Discard draft", ACTION_UNDO, primary=False))
+    return {"actions": actions}
+
+
+def _copy_send_buttons() -> dict:
+    """Action buttons after the user clicks Looks fire (post-approve)."""
+    return {"actions": [
+        _action("📋 Copy message", "copy", primary=False),
+        _action("🔗 Open LinkedIn", "open_linkedin", primary=False),
+        _action("✅ Mark sent", ACTION_MARK_SENT, primary=True),
+    ]}
+
+
+def _sent_state_buttons(state: str) -> dict:
+    """Action buttons after mark_sent — depends on which *_sent state we land in.
+    fu2_sent has no draft_followup_3 (terminal follow-up cadence)."""
+    actions = [_action("📨 They replied", ACTION_THEY_REPLIED, primary=True)]
+    if state == SENT:
+        actions.append(_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_1, primary=False))
+    elif state == FU1_SENT:
+        actions.append(_action("📝 Draft another follow-up", ACTION_DRAFT_FOLLOWUP_2, primary=False))
+    # FU2_SENT: no further followup button
+    actions.append(_action("🔗 Open LinkedIn", "open_linkedin", primary=False))
+    actions.append(_action("↩ Undo send", ACTION_UNDO, primary=False))
+    return {"actions": actions}
+
+
+def _followup_stub_text(contact: Contact, fu_number: int) -> str:
+    """Static placeholder for follow-up draft body. Real AI follow-up generation
+    is Issue 6d (a future ticket); per DD-B for REF-22 we hold the line on no
+    new AI functions."""
+    first = (contact.full_name or "there").split(" ")[0]
+    if fu_number == 1:
+        return (
+            f"Hey {first}, bumping this in case it slipped. Worth 15 min "
+            "to chat about the role and your team? Happy to send a hold "
+            "for Tue 4 or Thu 2."
+        )
+    return (
+        f"Hey {first}, last bump from me — totally get if the timing's "
+        "off. If it opens up later, I'm here. Wishing the team a great "
+        "quarter."
+    )
+
+
 # --- Pure state machine ---
 
 def _generate_ref_response(
@@ -152,7 +279,8 @@ def _generate_ref_response(
     The handler executes side effects + persists. No DB calls in this function.
 
     `edits_left_after` is "edits remaining AFTER this incoming user text edit",
-    not before. The caller computes this by counting prior user text rows.
+    not before. The caller computes this by counting prior user text rows
+    SINCE the current draft was created.
 
     `ai_result` is the parsed AI response dict (keys: chat, draft, play)
     pre-computed by the handler for branches that need AI generation.
@@ -198,10 +326,7 @@ def _generate_ref_response(
             chat_text = f"Pattern: **{play}**. {chat_text}"
         return RefResponse(
             messages=[
-                {
-                    "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": chat_text},
-                },
+                {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": chat_text}},
                 {
                     "role": ROLE_REF, "kind": KIND_DRAFT,
                     "content": {
@@ -210,19 +335,14 @@ def _generate_ref_response(
                         "show_counter": True,
                     },
                 },
-                {
-                    "role": ROLE_REF, "kind": KIND_ACTIONS,
-                    "content": {"actions": [
-                        _action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True),
-                    ]},
-                },
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=False)},
             ],
-            side_effects=[CreateInitialOutreach(text=draft_text)],
+            side_effects=[CreateOutreach(type="initial", text=draft_text)],
         )
 
-    # State: drafted ----------------------------------------------------------
+    # State: drafted / fu1_drafted / fu2_drafted (DRAFT_STATES) ---------------
 
-    if current_state == DRAFTED and kind == "text":
+    if current_state in DRAFT_STATES and kind == "text":
         # ai_result is pre-computed by the handler via revise_draft.
         ai = ai_result or {}
         revised = ai.get("draft", (content.get("text") or "").strip())
@@ -234,8 +354,7 @@ def _generate_ref_response(
         else:
             chat_text += " No more edits, hit \"Looks fire\" when you're ready."
 
-        actions = [_action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True)]
-
+        include_undo = current_state in (FU1_DRAFTED, FU2_DRAFTED)
         return RefResponse(
             messages=[
                 {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": chat_text}},
@@ -247,44 +366,155 @@ def _generate_ref_response(
                         "show_counter": True,
                     },
                 },
-                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": {"actions": actions}},
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=include_undo)},
             ],
-            side_effects=[UpdateInitialOutreach(text=revised)],
+            side_effects=[UpdateCurrentDraft(text=revised)],
         )
 
-    if current_state == DRAFTED and kind == "action" and action == ACTION_APPROVE_DRAFT:
+    if current_state in DRAFT_STATES and kind == "action" and action == ACTION_APPROVE_DRAFT:
+        if current_state == DRAFTED:
+            text = "Let's go 🚀 Copy it, paste into LinkedIn, then come back and hit \"Mark sent.\""
+        else:
+            text = "Let's send the follow-up. Copy it, paste into LinkedIn, then come back and hit \"Mark sent.\""
         return RefResponse(messages=[
-            {
-                "role": ROLE_REF, "kind": KIND_TEXT,
-                "content": {
-                    "text": (
-                        "Let's go 🚀 Copy it, paste into LinkedIn, then come back "
-                        "and hit \"Mark sent.\""
-                    ),
-                },
-            },
-            {
-                "role": ROLE_REF, "kind": KIND_ACTIONS,
-                "content": {"actions": [
-                    _action("📋 Copy message", "copy", primary=False),
-                    _action("🔗 Open LinkedIn", "open_linkedin", primary=False),
-                    _action("✅ Mark sent", ACTION_MARK_SENT, primary=True),
-                ]},
-            },
+            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+            {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _copy_send_buttons()},
         ])
 
-    if current_state == DRAFTED and kind == "action" and action == ACTION_MARK_SENT:
+    if current_state in DRAFT_STATES and kind == "action" and action == ACTION_MARK_SENT:
+        # After the frontend chains useUpdateOutreach to PATCH sent_at,
+        # _recompute_and_persist advances lifecycle to the matching *_sent state.
+        # We emit action_buttons matching the destination state here so they
+        # render alongside the "Sent!" text without a second round-trip.
+        dest_state = {
+            DRAFTED: SENT,
+            FU1_DRAFTED: FU1_SENT,
+            FU2_DRAFTED: FU2_SENT,
+        }[current_state]
+        return RefResponse(
+            messages=[
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {
+                        "text": (
+                            f"Sent! 📤 Ball's in {first}'s court now. I'll check "
+                            "back when they reply."
+                        ),
+                    },
+                },
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _sent_state_buttons(dest_state)},
+            ],
+            requires_followup="mark_sent",
+        )
+
+    # State: drafted undo (special — reverts to not_contacted) ----------------
+    # Undo from the initial drafted state deletes the initial OutreachMessage,
+    # which sends the contact back to not_contacted. Skipped in REF-22 because
+    # it interacts with the missing "connected" lifecycle state (PD-1, Issue 1).
+    # fu1_drafted / fu2_drafted DO support undo (delete the followup row,
+    # revert to sent / fu1_sent respectively).
+
+    if current_state in (FU1_DRAFTED, FU2_DRAFTED) and kind == "action" and action == ACTION_UNDO:
+        revert_to = SENT if current_state == FU1_DRAFTED else FU1_SENT
+        return RefResponse(
+            messages=[
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {"text": "Discarded that follow-up. Back where we were."},
+                },
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _sent_state_buttons(revert_to)},
+            ],
+            side_effects=[DeleteCurrentDraft()],
+        )
+
+    # State: sent / fu1_sent / fu2_sent (SENT_STATES) -------------------------
+
+    if current_state in SENT_STATES and kind == "action" and action == ACTION_THEY_REPLIED:
+        # Lifecycle moves to `replied` via the frontend's chained setContactRepliedAt.
+        # Replied is OUT of REF-22 scope (DQ-1) — ContactPopup's conditional
+        # routes `replied` to PostReplyView once the lifecycle transitions.
+        # We emit the chat message acknowledging the reply; the view-swap is
+        # automatic on the next render.
         return RefResponse(
             messages=[{
                 "role": ROLE_REF, "kind": KIND_TEXT,
                 "content": {
                     "text": (
-                        f"Sent! 📤 The ball's in {first}'s court now. I'll check "
-                        "back when they reply."
+                        "Nice — they replied! Let's lock 15 min for a coffee chat. "
+                        "That's the play."
                     ),
                 },
             }],
-            requires_followup="mark_sent",
+            requires_followup="mark_replied",
+        )
+
+    if current_state == SENT and kind == "action" and action == ACTION_DRAFT_FOLLOWUP_1:
+        stub = _followup_stub_text(contact, fu_number=1)
+        return RefResponse(
+            messages=[
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {
+                        "text": (
+                            "Drafted a follow-up. Tweak it, or hit \"Looks fire\" "
+                            "when ready."
+                        ),
+                    },
+                },
+                {
+                    "role": ROLE_REF, "kind": KIND_DRAFT,
+                    "content": {
+                        "text": stub,
+                        "edits_left": DRAFT_EDITS_INITIAL,
+                        "show_counter": True,
+                    },
+                },
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=True)},
+            ],
+            side_effects=[CreateOutreach(type="followup_1", text=stub)],
+        )
+
+    if current_state == FU1_SENT and kind == "action" and action == ACTION_DRAFT_FOLLOWUP_2:
+        stub = _followup_stub_text(contact, fu_number=2)
+        return RefResponse(
+            messages=[
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {
+                        "text": (
+                            "Drafted the final follow-up — the graceful close. "
+                            "Tweak it, or hit \"Looks fire\" when ready."
+                        ),
+                    },
+                },
+                {
+                    "role": ROLE_REF, "kind": KIND_DRAFT,
+                    "content": {
+                        "text": stub,
+                        "edits_left": DRAFT_EDITS_INITIAL,
+                        "show_counter": True,
+                    },
+                },
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=True)},
+            ],
+            side_effects=[CreateOutreach(type="followup_2", text=stub)],
+        )
+
+    if current_state in SENT_STATES and kind == "action" and action == ACTION_UNDO:
+        # Clears sent_at on the current sent-state OutreachMessage.
+        # _recompute_and_persist will revert lifecycle to the matching
+        # *_drafted state.
+        revert_to = {SENT: DRAFTED, FU1_SENT: FU1_DRAFTED, FU2_SENT: FU2_DRAFTED}[current_state]
+        include_undo = revert_to in (FU1_DRAFTED, FU2_DRAFTED)
+        return RefResponse(
+            messages=[
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {"text": "Undone — back to draft mode. Tweak away."},
+                },
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=include_undo)},
+            ],
+            side_effects=[UndoSent()],
         )
 
     # No-op fallthrough (shouldn't be reached given handler-side validation).
@@ -331,12 +561,59 @@ def _initial_message_for_contact(db: Session, contact: Contact) -> Optional[Outr
     )
 
 
-def _count_user_text_messages(db: Session, contact: Contact, user_id: uuid.UUID) -> int:
+def _outreach_message_of_type(
+    db: Session, contact: Contact, msg_type: str,
+) -> Optional[OutreachMessage]:
+    return (
+        db.query(OutreachMessage)
+        .filter(
+            OutreachMessage.contact_id == contact.id,
+            OutreachMessage.user_id == contact.user_id,
+            OutreachMessage.type == msg_type,
+        )
+        .first()
+    )
+
+
+def _current_draft_message_for_contact(
+    db: Session, contact: Contact,
+) -> Optional[OutreachMessage]:
+    """Return the OutreachMessage the user is currently editing/viewing as a
+    draft, based on lifecycle_status. None if the contact isn't in a drafted
+    or sent state.
+
+    drafted          -> initial
+    sent             -> initial
+    followup_1_*     -> followup_1
+    followup_2_*     -> followup_2
+    """
+    state = contact.lifecycle_status or NOT_CONTACTED
+    target_type = _DRAFT_STATE_TO_TYPE.get(state) or _SENT_STATE_TO_TYPE.get(state)
+    if not target_type:
+        return None
+    return _outreach_message_of_type(db, contact, target_type)
+
+
+def _count_user_text_messages_since_current_draft(
+    db: Session, contact: Contact, user_id: uuid.UUID,
+) -> int:
+    """Count user text messages created after the current draft's
+    OutreachMessage row. This gives a per-draft edit budget — the counter
+    resets when a new OutreachMessage (followup_1, followup_2) is created.
+
+    REF-22: replaces _count_user_text_messages which counted across all
+    drafts. Without this fix, follow-up drafts would start with 0 edits
+    remaining because the initial-draft edits already used the budget.
+    """
+    current_draft = _current_draft_message_for_contact(db, contact)
+    if current_draft is None:
+        return 0
     return db.query(func.count(RefChatMessage.id)).filter(
         RefChatMessage.contact_id == contact.id,
         RefChatMessage.user_id == user_id,
         RefChatMessage.role == ROLE_USER,
         RefChatMessage.kind == KIND_TEXT,
+        RefChatMessage.created_at > current_draft.created_at,
     ).scalar() or 0
 
 
@@ -428,12 +705,14 @@ def init_chat(
     state = contact.lifecycle_status or NOT_CONTACTED
     first = (contact.full_name or "there").split(" ")[0]
 
+    intel = {
+        "role": ROLE_REF, "kind": KIND_INTEL,
+        "content": _intel_card_content(contact),
+    }
+
     if state == NOT_CONTACTED:
         seed = [
-            {
-                "role": ROLE_REF, "kind": KIND_INTEL,
-                "content": _intel_card_content(contact),
-            },
+            intel,
             {
                 "role": ROLE_REF, "kind": KIND_TEXT,
                 "content": {
@@ -455,21 +734,26 @@ def init_chat(
                 ]},
             },
         ]
-    elif state == DRAFTED:
-        existing_msg = _initial_message_for_contact(db, contact)
+    elif state in DRAFT_STATES:
+        # drafted -> initial; fu1_drafted -> followup_1; fu2_drafted -> followup_2
+        target_type = _DRAFT_STATE_TO_TYPE[state]
+        existing_msg = _outreach_message_of_type(db, contact, target_type)
         if existing_msg is None:
             raise HTTPException(
                 status_code=400,
-                detail="Drafted contact has no initial message — inconsistent state",
+                detail=f"{state} contact has no {target_type} message — inconsistent state",
             )
+        if state == DRAFTED:
+            intro = "Picking up where we left off — here's your current draft."
+        else:
+            fu_num = 1 if state == FU1_DRAFTED else 2
+            intro = f"Picking up your follow-up {fu_num} draft."
+        include_undo = state in (FU1_DRAFTED, FU2_DRAFTED)
         seed = [
-            {
-                "role": ROLE_REF, "kind": KIND_INTEL,
-                "content": _intel_card_content(contact),
-            },
+            intel,
             {
                 "role": ROLE_REF, "kind": KIND_TEXT,
-                "content": {"text": "Picking up where we left off — here's your current draft."},
+                "content": {"text": intro},
             },
             {
                 "role": ROLE_REF, "kind": KIND_DRAFT,
@@ -481,12 +765,39 @@ def init_chat(
             },
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
-                "content": {"actions": [
-                    _action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True),
-                ]},
+                "content": _approve_buttons(include_undo=include_undo),
+            },
+        ]
+    elif state in SENT_STATES:
+        # Legacy contact in a *_sent state with empty chat history.
+        if state == SENT:
+            text = (
+                f"Sent! Ball's in {first}'s court. I'll check back when "
+                "they reply."
+            )
+        elif state == FU1_SENT:
+            text = (
+                "Follow-up 1 sent. Bumps shake replies loose more often "
+                "than you'd think."
+            )
+        else:  # FU2_SENT
+            text = (
+                "Final follow-up sent. If no reply, that's data — we "
+                "pivot next."
+            )
+        seed = [
+            intel,
+            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+            {
+                "role": ROLE_REF, "kind": KIND_ACTIONS,
+                "content": _sent_state_buttons(state),
             },
         ]
     else:
+        # replied / coffee_chat_* / interview_* / outcome_* — out of REF-22 scope.
+        # Per DD-A, these route to PostReplyView via ContactPopup's conditional.
+        # init_chat shouldn't be called for them (the conditional excludes them),
+        # but stay defensive: clear 400 with a state-specific message.
         raise HTTPException(
             status_code=400,
             detail=f"Chat init not supported for state {state!r}",
@@ -520,56 +831,57 @@ def post_chat(
     content = body.content or {}
 
     # --- Validate ---
+    # All state-mismatch 400s use the same _validation_error template so the
+    # frontend's useRefChat onError can detect "stale button" clicks reliably.
     if kind == "action":
         action = content.get("action")
         if action not in VALID_USER_ACTIONS:
             raise HTTPException(status_code=400, detail=f"Unknown action: {action!r}")
 
         if action == ACTION_SENT_CONNECTION and state != NOT_CONTACTED:
-            raise HTTPException(
-                status_code=400,
-                detail=f"'sent_connection_request' only valid in 'not_contacted' (current: {state!r})",
-            )
+            raise _validation_error(action, state)
         if action == ACTION_SHE_ACCEPTED:
             if state != NOT_CONTACTED:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"'she_accepted' only valid in 'not_contacted' (current: {state!r})",
-                )
+                raise _validation_error(action, state)
             if _initial_message_for_contact(db, contact) is not None:
                 raise HTTPException(
                     status_code=409,
                     detail="An initial outreach message already exists for this contact",
                 )
-        if action == ACTION_APPROVE_DRAFT and state != DRAFTED:
-            raise HTTPException(
-                status_code=400,
-                detail=f"'approve_draft' only valid in 'drafted' (current: {state!r})",
-            )
-        if action == ACTION_MARK_SENT and state != DRAFTED:
-            raise HTTPException(
-                status_code=400,
-                detail=f"'mark_sent' only valid in 'drafted' (current: {state!r})",
-            )
+        if action == ACTION_APPROVE_DRAFT and state not in DRAFT_STATES:
+            raise _validation_error(action, state)
+        if action == ACTION_MARK_SENT and state not in DRAFT_STATES:
+            raise _validation_error(action, state)
+        if action == ACTION_THEY_REPLIED and state not in SENT_STATES:
+            raise _validation_error(action, state)
+        if action == ACTION_DRAFT_FOLLOWUP_1 and state != SENT:
+            raise _validation_error(action, state)
+        if action == ACTION_DRAFT_FOLLOWUP_2 and state != FU1_SENT:
+            raise _validation_error(action, state)
+        if action == ACTION_UNDO and state not in (SENT_STATES | {FU1_DRAFTED, FU2_DRAFTED}):
+            # Undo from `drafted` is intentionally NOT supported in REF-22 —
+            # it would revert to not_contacted and interact with the missing
+            # `connected` lifecycle state (PD-1 / Issue 1).
+            raise _validation_error(action, state)
 
     elif kind == "text":
         text_val = (content.get("text") or "").strip()
         if not text_val:
             raise HTTPException(status_code=400, detail="text content cannot be empty")
-        if state != DRAFTED:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Free-text edits only accepted in 'drafted' (current: {state!r})",
-            )
+        if state not in DRAFT_STATES:
+            raise _validation_error("text_edit", state)
 
     else:
         # Pydantic Literal already enforces this; defensive only.
         raise HTTPException(status_code=400, detail=f"Unknown kind: {kind!r}")
 
-    # Edits-left server-side check (counts user text messages persisted so far).
+    # Edits-left server-side check (counts user text messages persisted so far
+    # SINCE the current draft was created — per-draft budget, not per-contact).
     edits_left_after: Optional[int] = None
     if kind == "text":
-        prior_edits = _count_user_text_messages(db, contact, current_user.id)
+        prior_edits = _count_user_text_messages_since_current_draft(
+            db, contact, current_user.id,
+        )
         if prior_edits >= DRAFT_EDITS_INITIAL:
             raise HTTPException(status_code=400, detail="No edits remaining for this draft")
         edits_left_after = DRAFT_EDITS_INITIAL - prior_edits - 1
@@ -589,7 +901,9 @@ def post_chat(
         )
         ai_result = generate_initial_draft(contact, job, current_user, chat_history)
 
-    elif kind == "text" and state == DRAFTED:
+    elif kind == "text" and state in DRAFT_STATES:
+        # revise_draft works on any draft (initial / followup_1 / followup_2);
+        # the AI doesn't care what type the OutreachMessage is, just the text.
         job = _load_job_owned(job_id, current_user, db)
         chat_history = (
             db.query(RefChatMessage)
@@ -597,7 +911,7 @@ def post_chat(
             .order_by(RefChatMessage.created_at.asc())
             .all()
         )
-        existing_msg = _initial_message_for_contact(db, contact)
+        existing_msg = _current_draft_message_for_contact(db, contact)
         current_draft = existing_msg.message if existing_msg else ""
         user_instruction = (content.get("text") or "").strip()
         edit_number = DRAFT_EDITS_INITIAL - max(0, edits_left_after or 0)
@@ -621,28 +935,67 @@ def post_chat(
 
     # --- Apply side effects ---
     for se in response.side_effects:
-        if isinstance(se, CreateInitialOutreach):
+        if isinstance(se, CreateOutreach):
+            # Used by: she_accepted (type=initial), draft_followup_1, draft_followup_2.
+            # is_ai_generated=True for initial (REF-17 AI draft); False for followup
+            # stubs (DD-B: real AI follow-up generation is deferred to Issue 6d).
             new_msg = OutreachMessage(
                 job_id=contact.job_id,
                 contact_id=contact.id,
                 user_id=contact.user_id,
                 message=se.text,
-                type="initial",
-                is_ai_generated=True,
+                type=se.type,
+                is_ai_generated=(se.type == "initial"),
             )
             db.add(new_msg)
             db.flush()
-            _recompute_and_persist(contact, db)  # NOT_CONTACTED -> drafted
-        elif isinstance(se, UpdateInitialOutreach):
-            existing = _initial_message_for_contact(db, contact)
+            _recompute_and_persist(contact, db)
+            # not_contacted -> drafted (for initial)
+            # sent -> fu1_drafted (for followup_1)
+            # fu1_sent -> fu2_drafted (for followup_2)
+        elif isinstance(se, UpdateCurrentDraft):
+            existing = _current_draft_message_for_contact(db, contact)
             if existing is None:
                 raise HTTPException(
                     status_code=500,
-                    detail="Initial message missing during edit",
+                    detail=f"Current draft missing during edit (state={contact.lifecycle_status!r})",
                 )
             existing.message = se.text
             db.flush()
-            _recompute_and_persist(contact, db)  # idempotent for drafted
+            _recompute_and_persist(contact, db)  # idempotent (no state change)
+        elif isinstance(se, DeleteCurrentDraft):
+            # Undo from fu1_drafted / fu2_drafted: delete the followup row.
+            existing = _current_draft_message_for_contact(db, contact)
+            if existing is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Current draft missing during undo (state={contact.lifecycle_status!r})",
+                )
+            db.delete(existing)
+            db.flush()
+            _recompute_and_persist(contact, db)
+            # fu1_drafted -> sent (after deleting fu1)
+            # fu2_drafted -> fu1_sent (after deleting fu2)
+        elif isinstance(se, UndoSent):
+            # Undo from sent / fu1_sent / fu2_sent: clear sent_at on the
+            # matching OutreachMessage so lifecycle reverts to the *_drafted state.
+            existing = _current_draft_message_for_contact(db, contact)
+            if existing is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Current sent message missing during undo (state={contact.lifecycle_status!r})",
+                )
+            existing.sent_at = None
+            db.flush()
+            _recompute_and_persist(contact, db)
+            # sent -> drafted; fu1_sent -> fu1_drafted; fu2_sent -> fu2_drafted
+        elif isinstance(se, UndoReplied):
+            # Reserved for a future ticket that brings replied into chat.
+            # Defensive: should never be produced by REF-22 code paths.
+            raise HTTPException(
+                status_code=500,
+                detail="UndoReplied is reserved — no REF-22 branch emits it",
+            )
 
     # --- Persist Ref's messages ---
     ref_rows = _persist_ref_messages(db, contact, response.messages)
