@@ -12,14 +12,15 @@ import {
   RefChatUserActionContent,
 } from "@/types/refChat";
 import { Textarea } from "@/components/ui/textarea";
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
-  AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
+  AlertDialogPortal,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useContactOutreach, useUpdateOutreach } from "@/hooks/useOutreach";
@@ -351,29 +352,45 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
         {(send.isPending || updateOutreach.isPending) && <TypingIndicator />}
       </div>
 
-      {/* REF-23: send-message confirmation. Escape calls onOpenChange(false)
-          which routes to handleNotYet (DQ-2). Outside-click is blocked by
-          shadcn AlertDialog default. */}
+      {/* REF-23 / REF-27: send-message confirmation. Escape calls
+          onOpenChange(false) which routes to handleNotYet (DQ-2). Outside-click
+          is blocked by shadcn AlertDialog default.
+
+          REF-27 z-index fix: the parent ContactPopup uses z-[100] / z-[101]
+          (see ContactPopup.tsx:148-151), and shadcn's default AlertDialogContent
+          wrapper hardcodes both its overlay and content at z-50 — which would
+          render the dialog BEHIND the popup, invisible, while still trapping
+          focus and freezing the UI. We bypass the wrapper by placing
+          AlertDialogPrimitive.Overlay and .Content manually with z-[110] / z-[111].
+          (CLAUDE.md forbids editing shadcn ui/ files directly, so we extend in
+          place rather than touching alert-dialog.tsx.) */}
       <AlertDialog
         open={confirmOpen}
         onOpenChange={(open) => { if (!open) handleNotYet(); }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Did you send the message?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {contact.linkedinUrl
-                ? "Click Yes once the DM is sent on LinkedIn. We'll mark it as sent."
-                : "Send the message manually on LinkedIn, then come back."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleNotYet}>Not yet</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSent}>
-              Yes, sent
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+        <AlertDialogPortal>
+          <AlertDialogPrimitive.Overlay
+            className="fixed inset-0 z-[110] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          />
+          <AlertDialogPrimitive.Content
+            className="fixed left-[50%] top-[50%] z-[111] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          >
+            <AlertDialogHeader>
+              <AlertDialogTitle>Did you send the message?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {contact.linkedinUrl
+                  ? "Click Yes once the DM is sent on LinkedIn. We'll mark it as sent."
+                  : "Send the message manually on LinkedIn, then come back."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleNotYet}>Not yet</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmSent}>
+                Yes, sent
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogPrimitive.Content>
+        </AlertDialogPortal>
       </AlertDialog>
 
       {editorVisible && (
