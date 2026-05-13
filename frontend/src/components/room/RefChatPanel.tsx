@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useContactOutreach, useUpdateOutreach } from "@/hooks/useOutreach";
 import { useInitRefChat, useRefChatMessages, useSendRefChat } from "@/hooks/useRefChat";
 import { STATES } from "@/lib/contactLifecycle";
+import { setContactRepliedAt } from "@/lib/api/contacts";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface RefChatPanelProps {
   contact: Contact;
@@ -34,10 +36,23 @@ interface RefChatPanelProps {
  *  - lifecycle transitions (the chat endpoint and useUpdateOutreach do).
  *  - any state outside not_contacted / drafted.
  */
+// Map from a drafted/sent lifecycle state to the OutreachMessage.type the
+// user is currently editing/sending. Mirrors the backend's _DRAFT_STATE_TO_TYPE
+// + _SENT_STATE_TO_TYPE in ref_chat.py.
+const STATE_TO_OUTREACH_TYPE: Record<string, "initial" | "followup_1" | "followup_2"> = {
+  [STATES.DRAFTED]: "initial",
+  [STATES.SENT]: "initial",
+  [STATES.FOLLOWUP_1_DRAFTED]: "followup_1",
+  [STATES.FOLLOWUP_1_SENT]: "followup_1",
+  [STATES.FOLLOWUP_2_DRAFTED]: "followup_2",
+  [STATES.FOLLOWUP_2_SENT]: "followup_2",
+};
+
 const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) => {
   const status = contact.lifecycleStatus ?? STATES.NOT_CONTACTED;
   const jobId = job.id;
   const contactId = contact.id;
+  const qc = useQueryClient();
 
   const { data: messages = [], isLoading: chatLoading } = useRefChatMessages(jobId, contactId, !!contactId);
   const initChat = useInitRefChat(jobId, contactId);
@@ -46,22 +61,46 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   const { data: outreachMsgs = [] } = useContactOutreach(jobId, contactId, !!contactId);
   const updateOutreach = useUpdateOutreach(jobId, contactId);
 
-  const initialMessage = useMemo(
-    () => outreachMsgs.find((m) => m.type === "initial") ?? null,
-    [outreachMsgs],
-  );
+  // REF-22: generalized from initialMessage. For mark_sent the chat needs to
+  // PATCH the OutreachMessage matching the current draft state (initial /
+  // followup_1 / followup_2).
+  const currentDraftMessage = useMemo(() => {
+    const targetType = STATE_TO_OUTREACH_TYPE[status];
+    if (!targetType) return null;
+    return outreachMsgs.find((m) => m.type === targetType) ?? null;
+  }, [outreachMsgs, status]);
+
+  // they_replied chains setContactRepliedAt — local mutation since contacts.ts
+  // exports a function, not a hook.
+  const markReplied = useMutation({
+    mutationFn: () => setContactRepliedAt(jobId, contactId, new Date().toISOString()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["contacts", jobId] });
+      qc.invalidateQueries({ queryKey: ["outreach", jobId, contactId] });
+    },
+  });
 
   const [draftInput, setDraftInput] = useState("");
   const initFiredRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-init on first mount when chat is empty.
-  // Triggers for not_contacted (full intro) and drafted (re-render existing draft).
+  // REF-22: widened from {not_contacted, drafted} to cover all 7 chat-owned
+  // states so legacy contacts (in sent/fu*_* with empty ref_chat_messages)
+  // get a clean seed instead of an unhandled-state 400.
   useEffect(() => {
     if (initFiredRef.current) return;
     if (chatLoading) return;
     if (messages.length > 0) return;
-    if (status !== STATES.NOT_CONTACTED && status !== STATES.DRAFTED) return;
+    if (
+      status !== STATES.NOT_CONTACTED &&
+      status !== STATES.DRAFTED &&
+      status !== STATES.SENT &&
+      status !== STATES.FOLLOWUP_1_DRAFTED &&
+      status !== STATES.FOLLOWUP_1_SENT &&
+      status !== STATES.FOLLOWUP_2_DRAFTED &&
+      status !== STATES.FOLLOWUP_2_SENT
+    ) return;
     if (initChat.isPending) return;
     initFiredRef.current = true;
     initChat.mutate();
@@ -100,7 +139,13 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   }, [messages]);
 
   const editsLeft = latestDraftCard?.edits_left ?? 0;
-  const editorVisible = status === STATES.DRAFTED && !draftApproved;
+  // DD-F: composer renders for drafted / fu1_drafted / fu2_drafted, hidden in
+  // every other state (no draft = no editor activity).
+  const editorVisible =
+    (status === STATES.DRAFTED ||
+      status === STATES.FOLLOWUP_1_DRAFTED ||
+      status === STATES.FOLLOWUP_2_DRAFTED) &&
+    !draftApproved;
   const editorDisabled = !editorVisible || editsLeft <= 0 || send.isPending;
 
   // --- Action dispatcher ---
@@ -131,29 +176,42 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
       actionKind === "sent_connection_request" ||
       actionKind === "she_accepted" ||
       actionKind === "approve_draft" ||
-      actionKind === "mark_sent"
+      actionKind === "mark_sent" ||
+      actionKind === "they_replied" ||
+      actionKind === "draft_followup_1" ||
+      actionKind === "draft_followup_2" ||
+      actionKind === "undo"
     ) {
       send.mutate(
         { kind: "action", content: { action: actionKind } },
         {
           onSuccess: (response) => {
+            // REF-22: mark_sent chain uses currentDraftMessage (initial /
+            // followup_1 / followup_2) — generalized from the REF-13 initial-only path.
             if (response.requiresFollowup === "mark_sent") {
-              if (!initialMessage) {
-                toast.error("Couldn't find the initial message to mark sent.");
+              if (!currentDraftMessage) {
+                toast.error("Couldn't find the draft to mark sent.");
                 return;
               }
               updateOutreach.mutate(
                 {
-                  outreachId: initialMessage.id,
+                  outreachId: currentDraftMessage.id,
                   patch: { sent_at: new Date().toISOString() },
                 },
-                {
-                  onSuccess: () => {
-                    onTransitionToSent();
-                  },
-                },
+                { onSuccess: () => onTransitionToSent() },
               );
+            } else if (response.requiresFollowup === "mark_replied") {
+              // After lifecycle moves to `replied`, ContactPopup's conditional
+              // routes the body to PostReplyView (replied is OUT of REF-22 scope
+              // per DD-A). The chat re-render swap happens automatically.
+              markReplied.mutate();
             }
+            // draft_followup_*: server already created the OutreachMessage as a
+            // side effect; lifecycle moves to fu*_drafted; the new draft_card
+            // chat row is in response.newMessages and appended by useSendRefChat.
+            // undo: server already applied the rollback side effect; lifecycle
+            // moved; new action_buttons emitted in response.newMessages.
+            // No frontend chain needed for either.
           },
         },
       );

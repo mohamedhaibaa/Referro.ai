@@ -13,6 +13,19 @@ import MessageDraftView from "./MessageDraftView";
 import PostReplyView from "./PostReplyView";
 import RefChatPanel from "./RefChatPanel";
 
+// Lifecycle states whose body renders RefChatPanel (vs PostReplyView /
+// MessageDraftView). REF-22 added the 5 states past `drafted`. `replied`
+// and the meeting/outcome states stay in PostReplyView per DD-A.
+const CHAT_OWNED_STATES = new Set<string>([
+  STATES.NOT_CONTACTED,
+  STATES.DRAFTED,
+  STATES.SENT,
+  STATES.FOLLOWUP_1_DRAFTED,
+  STATES.FOLLOWUP_1_SENT,
+  STATES.FOLLOWUP_2_DRAFTED,
+  STATES.FOLLOWUP_2_SENT,
+]);
+
 interface ContactPopupProps {
   job: Job;
   contact: Contact | null;
@@ -206,11 +219,12 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
                   <Skeleton className="h-9 w-32 rounded-full" />
                 </div>
               </div>
-            ) : status === STATES.NOT_CONTACTED || status === STATES.DRAFTED ? (
-              // REF-13: chat-driven flow for not_contacted + drafted only.
-              // Other states (sent, followup_*, replied, *_completed, outcome_*)
-              // continue through the existing button-based UIs below until
-              // they're migrated in REF-14+.
+            ) : CHAT_OWNED_STATES.has(status) ? (
+              // REF-13/22: chat-driven flow for not_contacted + drafted +
+              // sent + followup_*_drafted + followup_*_sent.
+              // replied / coffee_chat_* / interview_* / outcome_* continue
+              // through PostReplyView until a future ticket (REF-23) brings
+              // them into chat.
               <RefChatPanel
                 job={job}
                 contact={contact}
