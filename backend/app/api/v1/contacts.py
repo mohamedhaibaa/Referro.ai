@@ -229,6 +229,7 @@ def revisit_contacts(
 
 class PatchContactRequest(BaseModel):
     is_selected: Optional[bool] = None
+    connected_at: Optional[str] = None  # REF-28
     replied_at: Optional[str] = None
     coffee_chat_scheduled_at: Optional[str] = None
     coffee_chat_completed_at: Optional[str] = None
@@ -239,6 +240,7 @@ class PatchContactRequest(BaseModel):
 
 
 _TIMESTAMP_FIELDS = (
+    "connected_at",  # REF-28
     "replied_at",
     "coffee_chat_scheduled_at",
     "coffee_chat_completed_at",

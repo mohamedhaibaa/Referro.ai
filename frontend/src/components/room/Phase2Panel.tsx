@@ -10,7 +10,7 @@ interface Phase2PanelProps {
 }
 
 function statusBadgeClasses(status: string): string {
-  if (status === STATES.NOT_CONTACTED) return "bg-muted text-muted-foreground";
+  if (status === STATES.NOT_CONTACTED || status === STATES.CONNECTED) return "bg-muted text-muted-foreground";  // REF-28
   if (status === STATES.DRAFTED || status === STATES.FOLLOWUP_1_DRAFTED || status === STATES.FOLLOWUP_2_DRAFTED) {
     return "bg-muted text-foreground";
   }
@@ -36,7 +36,10 @@ const Phase2Panel = ({ job }: Phase2PanelProps) => {
   );
 
   const sentCount = selected.filter((c) =>
-    c.lifecycleStatus && c.lifecycleStatus !== STATES.NOT_CONTACTED && c.lifecycleStatus !== STATES.DRAFTED
+    c.lifecycleStatus
+    && c.lifecycleStatus !== STATES.NOT_CONTACTED
+    && c.lifecycleStatus !== STATES.CONNECTED  // REF-28
+    && c.lifecycleStatus !== STATES.DRAFTED
   ).length;
 
   const allClosedNoOffer = useMemo(() => {

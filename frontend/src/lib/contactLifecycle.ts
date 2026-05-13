@@ -2,6 +2,7 @@ import { OutreachType } from "@/types/job";
 
 export const STATES = {
   NOT_CONTACTED: "not_contacted",
+  CONNECTED: "connected",  // REF-28
   DRAFTED: "drafted",
   SENT: "sent",
   FOLLOWUP_1_DRAFTED: "followup_1_drafted",
@@ -39,6 +40,7 @@ export const OUTCOMES = {
 export type OutcomeValue = typeof OUTCOMES[keyof typeof OUTCOMES];
 
 const OUTREACH_STATES = new Set<string>([
+  STATES.CONNECTED,  // REF-28: pre-draft outreach (timeline bucket 1)
   STATES.DRAFTED, STATES.SENT,
   STATES.FOLLOWUP_1_DRAFTED, STATES.FOLLOWUP_1_SENT,
   STATES.FOLLOWUP_2_DRAFTED, STATES.FOLLOWUP_2_SENT,
@@ -85,6 +87,7 @@ export function timelineIndex(status: string): number {
 export function statusLabel(status: string): string {
   switch (status) {
     case STATES.NOT_CONTACTED: return "Not contacted yet";
+    case STATES.CONNECTED: return "Connection sent";
     case STATES.DRAFTED: return "Draft in progress";
     case STATES.SENT: return "Message sent";
     case STATES.FOLLOWUP_1_DRAFTED: return "Follow-up 1 drafted";
@@ -111,6 +114,7 @@ export function statusLabel(status: string): string {
 export function shortStatusBadge(status: string): string {
   switch (status) {
     case STATES.NOT_CONTACTED: return "Not contacted yet";
+    case STATES.CONNECTED: return "Connected";
     case STATES.DRAFTED: return "Draft";
     case STATES.SENT: return "Sent";
     case STATES.FOLLOWUP_1_DRAFTED: return "FU1 draft";
@@ -231,6 +235,7 @@ export function canUndo(status: string): boolean {
 
 export function undoLabel(status: string): string {
   switch (status) {
+    case STATES.CONNECTED: return "Discard connection";
     case STATES.DRAFTED: return "Discard draft";
     case STATES.SENT: return "Unsend";
     case STATES.FOLLOWUP_1_DRAFTED: return "Discard follow-up draft";

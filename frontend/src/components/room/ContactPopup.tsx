@@ -18,6 +18,7 @@ import RefChatPanel from "./RefChatPanel";
 // and the meeting/outcome states stay in PostReplyView per DD-A.
 const CHAT_OWNED_STATES = new Set<string>([
   STATES.NOT_CONTACTED,
+  STATES.CONNECTED,  // REF-28
   STATES.DRAFTED,
   STATES.SENT,
   STATES.FOLLOWUP_1_DRAFTED,
@@ -54,6 +55,7 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
   });
 
   type ClearableField =
+    | "connected_at"  // REF-28
     | "coffee_chat_scheduled_at"
     | "coffee_chat_completed_at"
     | "interview_scheduled_at"
@@ -87,6 +89,12 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
 
   const handleUndo = () => {
     if (!contact) return;
+
+    if (status === STATES.CONNECTED) {
+      // REF-28: clear connected_at → cascade returns not_contacted
+      clearField.mutate("connected_at");
+      return;
+    }
 
     if (status === STATES.REPLIED) {
       setReplied.mutate(null);

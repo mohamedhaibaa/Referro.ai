@@ -82,55 +82,46 @@ Note: sequencing can change; this is the starting plan, not a commitment.
 
 ### Issue 1 — Connection Request Button
 
-**Status**: Not started
-**Ticket**: (none yet)
+**Status**: Shipped
+**Ticket**: REF-28
 **Estimated complexity**: M
-**Dependencies**: none upstream; blocks Issue 2 (copy & simulate decisions intertwine)
+**Dependencies**: none upstream
 
-#### What this issue is
+#### What this issue was
 
-After contact selection, the chat surfaces an "I sent the connection
-request ✅" button. Target: turn it into a deep-link "Click to connect
-with `<name>` on LinkedIn" that opens LinkedIn, and on user return
-moves lifecycle to "connected."
-
-#### What the audit found
-
-The button is seeded by `init_chat` at `backend/app/api/v1/ref_chat.py:451-459`
-(action `sent_connection_request`, primary). Clicking it triggers
-`POST /ref-chat` → state machine at `ref_chat.py:167-185` returns the
-"Nice. Connection requests usually take a day or two…" copy plus the
-simulate button. **No URL is opened.** A separate "Open LinkedIn" icon
-exists in the popup header (`ContactPopup.tsx:175-185`), and the
-chat's `open_linkedin` action handler at `RefChatPanel.tsx:123-128` is
-implemented — but it's only surfaced AFTER draft approval, not on the
-connection step.
-
-The lifecycle (`backend/app/api/v1/outreach.py:44-77`) has no
-`connected` state. It goes `not_contacted → drafted → sent → …`. The
-`sent_connection_request` action does not advance lifecycle today.
-
-LinkedIn has **no public deep link for sending a connection request.**
-The closest is opening the profile URL (`contact.linkedin_url`) and
-the user clicks Connect manually. Anything more elaborate (URN
-scraping, bookmarklets) is out of scope.
+The "I sent the connection request" button was a no-op state advance:
+it triggered an AI message about waiting for acceptance but didn't
+open LinkedIn and didn't change lifecycle. Target was a deep-link
+button that opens the contact's LinkedIn profile and moves lifecycle
+to a new `connected` state between `not_contacted` and `drafted`.
+Detail in `/docs/modifications/REF-28.md`.
 
 #### Decisions
 
-- PD-1 resolved (see Product decisions section): add a `connected`
+- PD-1 resolved (see Product decisions section): add `connected`
   lifecycle state.
-- PD-2 resolved (see Product decisions section): button label is
+- PD-2 resolved (see Product decisions section): button label
   `"✅ {first_name} accepted"`.
 
 #### Ticket breakdown
 
-- REF-XX (TBD): "Wire connection-request deep-link + introduce
-  `connected` lifecycle state" — one ticket, M complexity. Includes
-  schema migration per PD-1 resolution.
+- REF-28 (shipped): "Wire connection-request deep-link + introduce
+  `connected` lifecycle state" — one ticket, M (lower end), ~+89
+  net code lines + migration `m3n4o5p6q7r8`.
 
 #### Updates
 
-(Empty — append as tickets ship.)
+2026-05-13 — REF-28 shipped (commit `<merge-sha>`, PR #N): new
+`connected` lifecycle state between `not_contacted` and `drafted`,
+backed by a nullable `contacts.connected_at` column (migration
+`m3n4o5p6q7r8`, applied to Azure prod). Click "🔗 Send connection
+request" → frontend opens `contact.linkedinUrl` in a new tab AND
+server PATCHes `connected_at = now()` via a new `MarkConnected`
+side-effect descriptor. `she_accepted` validation widened to accept
+both NOT_CONTACTED (legacy) and CONNECTED. Drafted-undo cascades
+automatically to `connected` (preserves the LinkedIn click).
+DQ-9: `init_chat` NOT_CONTACTED seed now greets the user by first
+name for parity with the new CONNECTED seed.
 
 ---
 
@@ -498,3 +489,6 @@ collapsed into a single "📨 Send message" with visibility-tracked
 confirmation dialog.
 2026-05-13 — REF-25 shipped (Issue 2): connection-pending copy
 greets the user by first name; simulate button relabeled.
+2026-05-13 — REF-28 shipped (Issue 1): new `connected` lifecycle
+state + connection-request deep link. Schema migration applied to
+Azure prod. REF-25 supersession noted in its mod record.

@@ -86,6 +86,7 @@ export async function patchContact(
   jobId: string,
   contactId: string,
   patch: {
+    connected_at?: string | null;  // REF-28
     coffee_chat_scheduled_at?: string | null;
     coffee_chat_completed_at?: string | null;
     interview_scheduled_at?: string | null;

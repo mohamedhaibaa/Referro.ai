@@ -105,3 +105,12 @@ label may shift again, since acceptance will move lifecycle into the
 new `connected` state rather than directly to `drafted`. The
 `user_first` plumbing is reusable for any future Ref copy that should
 address the user by name.
+
+## Updates
+
+2026-05-13 — REF-28 superseded the NOT_CONTACTED post-click message
+path described in this record. The "Nice work, {user_first}!"
+greeting is preserved and reused as the seed text for the new
+CONNECTED state (`init_chat` branch in `ref_chat.py`). The
+`user_first` plumbing on `_generate_ref_response` and `init_chat` is
+unchanged and continues to serve REF-28's content.

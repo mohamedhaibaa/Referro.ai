@@ -58,6 +58,7 @@ export function getStagePill(status: JobStatus, contactStatuses?: string[]): Sta
     if (active.includes("replied")) return { label: "In Conversation", tone: "early-active" };
     if (hasAny("sent", "followup_1_sent", "followup_2_sent")) return { label: "Outreach Sent", tone: "early-active" };
     if (hasAny("drafted", "followup_1_drafted", "followup_2_drafted")) return { label: "Drafting", tone: "neutral" };
+    if (active.includes("connected")) return { label: "Connection sent", tone: "neutral" };  // REF-28
 
     return { label: "Ready to reach out", tone: "neutral" };
   }

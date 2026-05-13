@@ -26,6 +26,7 @@ VALID_OUTCOMES = {
     "company_cancelled",
 }
 NOT_CONTACTED = "not_contacted"
+CONNECTED = "connected"  # REF-28: between not_contacted and drafted
 
 
 def _outreach_to_dict(m: OutreachMessage) -> dict:
@@ -49,7 +50,8 @@ def _derive_lifecycle_status(contact: Contact, messages: list[OutreachMessage]) 
     Priority chain (highest first — each short-circuits):
       outcome > interview_completed > interview_scheduled >
       coffee_chat_completed > coffee_chat_scheduled > replied >
-      (message-derived: followup_2 > followup_1 > initial) > not_contacted
+      (message-derived: followup_2 > followup_1 > initial) >
+      connected > not_contacted
     """
     if contact.outcome in VALID_OUTCOMES:
         return f"outcome_{contact.outcome}"
@@ -73,6 +75,12 @@ def _derive_lifecycle_status(contact: Contact, messages: list[OutreachMessage]) 
         return "followup_1_sent" if by_type["followup_1"].sent_at else "followup_1_drafted"
     if "initial" in by_type:
         return "sent" if by_type["initial"].sent_at else "drafted"
+
+    # REF-28: between initial-message-derived and not_contacted floor.
+    # Fires only when no OutreachMessage exists AND user has clicked the
+    # connection-request button.
+    if contact.connected_at is not None:
+        return CONNECTED
 
     return NOT_CONTACTED
 
