@@ -95,13 +95,14 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // REF-23: consolidated send-message flow state.
-  // sendArmed: between "Send message" click and AlertDialog answered (or 60s timeout).
+  // sendArmed: between "Copy & open LinkedIn" click and AlertDialog answered
+  // (or 60s timeout).
   // confirmOpen: controls the AlertDialog visibility.
-  // hiddenSinceMsRef / confirmOpenRef are refs for the visibility listener's
-  // live reads (closes-over-stale-state defense).
+  // confirmOpenRef mirrors confirmOpen for the visibility listener's live read.
+  // REF-24: hiddenSinceMsRef removed — any hidden→visible transition opens
+  // the dialog now (5s debounce dropped because real workflows are faster).
   const [sendArmed, setSendArmed] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const hiddenSinceMsRef = useRef<number | null>(null);
   const confirmOpenRef = useRef(false);
   useEffect(() => {
     confirmOpenRef.current = confirmOpen;
@@ -136,10 +137,11 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
     }
   }, [messages.length, send.isPending]);
 
-  // REF-23: visibility-tracking + 60s safety timeout for the send_message flow.
-  // PD-3 spec: open AlertDialog when user returns to tab after >= 5s away.
-  // DQ-5: 60s fallback opens dialog proactively for side-by-side-window users
-  // where visibilitychange never fires.
+  // REF-23 / REF-24: visibility-tracking + 60s safety timeout for the
+  // send-message flow. Any hidden→visible transition opens the AlertDialog
+  // (REF-24 dropped the 5s debounce — real workflows complete in 2-3s and
+  // the debounce blocked the dialog from firing). The 60s fallback covers
+  // side-by-side-window setups where visibilitychange never fires.
   useEffect(() => {
     if (!sendArmed) return;
     // linkedinUrl-null path: confirmOpen already true. Skip listener + timer.
@@ -147,18 +149,9 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
 
     const onVisibilityChange = () => {
       if (confirmOpenRef.current) return;
-      if (document.hidden) {
-        hiddenSinceMsRef.current = Date.now();
-      } else {
-        const startedAt = hiddenSinceMsRef.current;
-        if (startedAt === null) return;
-        const elapsed = Date.now() - startedAt;
-        if (elapsed >= 5000) {
-          setConfirmOpen(true);
-        } else {
-          // Quick tab switch — reset for potential next round.
-          hiddenSinceMsRef.current = null;
-        }
+      if (!document.hidden) {
+        // User returned to the tab. Open the dialog immediately.
+        setConfirmOpen(true);
       }
     };
 
@@ -254,7 +247,6 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
         window.open(contact.linkedinUrl!, "_blank", "noopener,noreferrer");
       }
 
-      hiddenSinceMsRef.current = null;
       setSendArmed(true);
       if (!hasLinkedInUrl) {
         // No tab-switch will happen; prompt immediately.

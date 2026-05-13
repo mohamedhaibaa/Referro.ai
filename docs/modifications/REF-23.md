@@ -143,3 +143,8 @@ No `TODO(REF-23)` markers. Future considerations:
 
 - **The 60s timeout fallback could be made configurable** if user
   feedback suggests it. Currently hardcoded as `60_000` ms.
+
+## Updates
+
+2026-05-13 — REF-24 follow-up: removed 5s debounce (real users move
+faster), relabeled button to "📋 Copy & open LinkedIn" for accuracy.
