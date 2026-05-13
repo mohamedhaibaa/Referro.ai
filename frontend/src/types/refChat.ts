@@ -36,7 +36,6 @@ export type RefChatActionKind =
   | "sent_connection_request"
   | "she_accepted"
   | "approve_draft"
-  | "edit_draft"
   | "mark_sent"
   | "copy"
   | "open_linkedin";

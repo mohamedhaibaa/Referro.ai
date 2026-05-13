@@ -213,7 +213,6 @@ def _generate_ref_response(
                 {
                     "role": ROLE_REF, "kind": KIND_ACTIONS,
                     "content": {"actions": [
-                        _action("📝 Edit", "edit_draft", primary=False),
                         _action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True),
                     ]},
                 },
@@ -236,8 +235,6 @@ def _generate_ref_response(
             chat_text += " No more edits, hit \"Looks fire\" when you're ready."
 
         actions = [_action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True)]
-        if left > 0:
-            actions.insert(0, _action("📝 Edit", "edit_draft", primary=False))
 
         return RefResponse(
             messages=[
@@ -485,7 +482,6 @@ def init_chat(
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
                 "content": {"actions": [
-                    _action("📝 Edit", "edit_draft", primary=False),
                     _action("Looks fire 🔥", ACTION_APPROVE_DRAFT, primary=True),
                 ]},
             },
