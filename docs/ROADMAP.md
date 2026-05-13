@@ -136,8 +136,8 @@ scraping, bookmarklets) is out of scope.
 
 ### Issue 2 — Connection-Pending Copy
 
-**Status**: Not started
-**Ticket**: (none yet)
+**Status**: Shipped
+**Ticket**: REF-25
 **Estimated complexity**: XS (copy + name) → S (if simulate button is also being redesigned)
 **Dependencies**: Issue 1 (the copy fires after Issue 1's button; simulate-button decision overlaps)
 
@@ -173,13 +173,18 @@ because there is no API path to detect real LinkedIn acceptance.
 
 #### Ticket breakdown
 
-- REF-XX (TBD): "Rewrite connection-pending copy + plumb user first
-  name into ref_chat state machine" — XS-S. May be folded into Issue 1
-  if shipped together.
+- REF-25 (shipped): "Rewrite connection-pending copy + plumb user
+  first name into ref_chat state machine" — XS, ~+10 net lines.
 
 #### Updates
 
-(Empty.)
+2026-05-13 — REF-25 shipped (commit `<merge-sha>`, PR #N): post-"I
+sent the connection request" copy rewritten to greet the user by
+first name and reframe the wait honestly. Button relabeled
+"🎉 They accepted! (simulate)" → "✅ {contact_first} accepted".
+`_generate_ref_response` gained an optional `user: User` parameter.
+Issue 1's PD-1 work will revisit this state when the `connected`
+lifecycle state lands.
 
 ---
 
@@ -491,3 +496,5 @@ Issue 6.
 2026-05-13 — REF-23 shipped (Issue 4): post-approve 3-button row
 collapsed into a single "📨 Send message" with visibility-tracked
 confirmation dialog.
+2026-05-13 — REF-25 shipped (Issue 2): connection-pending copy
+greets the user by first name; simulate button relabeled.
