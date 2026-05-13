@@ -313,11 +313,35 @@ def _generate_ref_response(
     # State: not_contacted ----------------------------------------------------
 
     if current_state == NOT_CONTACTED and kind == "action" and action == ACTION_SENT_CONNECTION:
-        # REF-28: side-effect-only. The chat re-renders into the CONNECTED
-        # state's init_chat seed on lifecycle update — no response messages
-        # emitted here. The frontend handler also opens the contact's
-        # LinkedIn profile in a new tab on click.
-        return RefResponse(side_effects=[MarkConnected()])
+        # REF-29: emit BOTH the MarkConnected side effect AND the connected-state
+        # chat content. REF-28's side-effect-only approach (Option H-A) assumed
+        # init_chat would re-fire on lifecycle update — that assumption was
+        # wrong. init_chat is a first-load helper that only seeds when chat
+        # history is empty. New chat content during a conversation comes from
+        # the response messages here.
+        #
+        # The text + button below must stay byte-identical to init_chat's
+        # CONNECTED branch (~line 751) so a user reaching this state via the
+        # button click sees the same content as a user re-opening a CONNECTED
+        # contact later. Frontend's handler also opens LinkedIn in a new tab.
+        greeting = f"Nice work, {user_first}!" if user_first else "Nice work!"
+        text = (
+            f"{greeting} Connection request sent to {first}. "
+            f"Come back when they accept and tap the button below "
+            "to let me know."
+        )
+        return RefResponse(
+            messages=[
+                {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+                {
+                    "role": ROLE_REF, "kind": KIND_ACTIONS,
+                    "content": {"actions": [
+                        _action(f"✅ {first} accepted", ACTION_SHE_ACCEPTED, primary=True),
+                    ]},
+                },
+            ],
+            side_effects=[MarkConnected()],
+        )
 
     if current_state in (NOT_CONTACTED, CONNECTED) and kind == "action" and action == ACTION_SHE_ACCEPTED:
         # ai_result is pre-computed by the handler via generate_initial_draft.
