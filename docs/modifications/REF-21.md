@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-21-pinned-composer-textarea`
 **Status:** shipped
+**Merged:** commit `a626156`, PR #7
 
 ## Scope
 

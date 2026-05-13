@@ -213,7 +213,7 @@ None.
 
 #### Updates
 
-2026-05-12 — REF-21 shipped (commit `<merge-sha>`, PR #N): pinned
+2026-05-12 — REF-21 shipped (commit `a626156`, PR #7): pinned
 composer to bottom of chat, edits-left counter relocated to composer
 area, "📝 Edit" no-op button removed from state machine + type union,
 Enter sends / Shift+Enter newline. Composer hidden in `not_contacted`
