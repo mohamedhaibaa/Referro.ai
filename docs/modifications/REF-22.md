@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-22-extend-chat-coverage`
 **Status:** shipped
+**Merged:** commit `7c10862`, PR #8
 
 ## Scope
 

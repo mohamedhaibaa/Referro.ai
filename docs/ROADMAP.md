@@ -368,7 +368,7 @@ update in `ContactPopup.tsx:209`.
 
 #### Updates
 
-2026-05-13 — REF-22 shipped (commit `<merge-sha>`, PR #N): chat
+2026-05-13 — REF-22 shipped (commit `7c10862`, PR #8): chat
 covers 5 new lifecycle states (`sent`, `fu1_drafted`, `fu1_sent`,
 `fu2_drafted`, `fu2_sent`). Added actions `they_replied`,
 `draft_followup_1`, `draft_followup_2`, `undo`. Generalized
