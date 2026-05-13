@@ -232,7 +232,7 @@ def _send_message_button() -> dict:
     visibilitychange wait + AlertDialog confirmation, then dispatches mark_sent
     on user confirmation."""
     return {"actions": [
-        _action("📨 Send message", "send_message", primary=True),
+        _action("📋 Copy & open LinkedIn", "send_message", primary=True),
     ]}
 
 
