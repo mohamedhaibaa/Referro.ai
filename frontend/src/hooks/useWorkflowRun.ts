@@ -12,7 +12,13 @@ export function useWorkflowRun(workflowRunId: string | null) {
     queryKey: ["workflow-runs", workflowRunId],
     queryFn: () => getWorkflowRun(workflowRunId!),
     enabled: !!workflowRunId,
+    // REF-26: stop polling on persistent error (auth, network, etc.) so a
+    // stuck workflow_run + expired token can't loop forever. Cap retries
+    // so we don't get a 3-retry storm on each tick.
+    retry: 1,
+    retryDelay: 1000,
     refetchInterval: (query) => {
+      if (query.state.error) return false;
       const status = query.state.data?.status;
       if (status && TERMINAL_STATUSES.includes(status)) return false;
       return 2000;
