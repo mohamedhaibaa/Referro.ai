@@ -38,23 +38,45 @@ Everything in this roadmap layers on top of that foundation.
 
 Note: sequencing can change; this is the starting plan, not a commitment.
 
-## Open product decisions
+## Product decisions
 
-- **PD-1 (blocks Issue 1)**: Do we add a `connected` lifecycle state?
+- **PD-1 (Issue 1)**: Do we add a `connected` lifecycle state?
   Adding it means a schema migration + state machine update. Skipping
   it means the post-connection-click flow goes directly to `drafted`.
-- **PD-2 (blocks Issue 2)**: What does the renamed "(simulate)" button
+  - **Resolved 2026-05-13.** Decision: Add a `connected` lifecycle
+    state. Rationale: matches the user's mental model of the funnel
+    and gives the chat a clean state to render between "request sent"
+    and "draft generated"; implementation lands as part of Issue 1's
+    ticket (schema migration + state machine update + UI branches).
+- **PD-2 (Issue 2)**: What does the renamed "(simulate)" button
   say? It can't actually detect LinkedIn acceptance — the user still
   has to tell us. So: what's the new label? ("She accepted" /
   "Mark as connected" / something else?)
-- **PD-3 (blocks Issue 4)**: After clicking "send", how do we confirm
+  - **Resolved 2026-05-13.** Decision: Label is `"✅ {first_name}
+    accepted"` with the contact's first name interpolated. Rationale:
+    matches the personalization pattern being added to Issue 2's
+    copy, removes the "(simulate)" demo framing without pretending
+    we have automatic detection.
+- **PD-3 (Issue 4)**: After clicking "send", how do we confirm
   the message went out? (a) confirmation prompt on tab return,
   (b) immediate optimistic mark-sent, (c) something else. Browser
   focus events are unreliable — pick the UX.
-- **PD-4 (blocks Issue 6c)**: For v1, is "extract proposed time + write
+  - **Resolved 2026-05-13.** Decision: Tab-return confirmation prompt
+    with ~5s debounce on `visibilitychange` to avoid false triggers
+    on quick tab switches. After detection, show "Did you send the
+    message? [Yes / Not yet]" — only Yes marks the message as sent.
+    Rationale: visibility events alone are too noisy to auto-mark;
+    explicit user confirmation keeps the lifecycle truthful.
+- **PD-4 (Issue 6c)**: For v1, is "extract proposed time + write
   to `coffee_chat_scheduled_at`" sufficient, or do we need real calendar
   invites (Google Calendar / Calendly / .ics)? The latter is an
   entirely new external integration (zero code exists today).
+  - **Resolved 2026-05-13.** Decision: v1 scope is extract proposed
+    time + prefill the existing picker + write to
+    `coffee_chat_scheduled_at`. No calendar invites. Rationale: ships
+    the AI value (parsed time → less typing) without committing to
+    OAuth or .ics generation; real calendar invite work is deferred
+    to a future ticket outside this roadmap.
 
 ## Issues
 
@@ -93,16 +115,18 @@ The closest is opening the profile URL (`contact.linkedin_url`) and
 the user clicks Connect manually. Anything more elaborate (URN
 scraping, bookmarklets) is out of scope.
 
-#### Decisions needed
+#### Decisions
 
-- **PD-1** (new `connected` lifecycle state)
-- **PD-2** (button copy / simulate replacement — overlaps with Issue 2)
+- PD-1 resolved (see Product decisions section): add a `connected`
+  lifecycle state.
+- PD-2 resolved (see Product decisions section): button label is
+  `"✅ {first_name} accepted"`.
 
 #### Ticket breakdown
 
 - REF-XX (TBD): "Wire connection-request deep-link + introduce
   `connected` lifecycle state" — one ticket, M complexity. Includes
-  schema migration if PD-1 resolves "yes."
+  schema migration per PD-1 resolution.
 
 #### Updates
 
@@ -142,9 +166,10 @@ because there is no API path to detect real LinkedIn acceptance.
 (`backend/app/db/models/user.py:20`, NOT NULL); the same
 `split(" ")[0]` pattern works.
 
-#### Decisions needed
+#### Decisions
 
-- **PD-2** (new label for the simulate button)
+- PD-2 resolved (see Product decisions section): button label is
+  `"✅ {first_name} accepted"`.
 
 #### Ticket breakdown
 
@@ -263,10 +288,11 @@ v1: open the profile and the user clicks "Message."
 from LinkedIn." Likely needs a confirmation prompt regardless of
 auto-detection.
 
-#### Decisions needed
+#### Decisions
 
-- **PD-3** (confirmation flow on tab return vs. immediate optimistic
-  mark-sent)
+- PD-3 resolved (see Product decisions section): tab-return
+  confirmation prompt with ~5s `visibilitychange` debounce; explicit
+  user Yes marks sent.
 
 #### Ticket breakdown
 
@@ -395,7 +421,8 @@ I grepped `backend/`, `worker/`, `frontend/src/` for `calendly`,
 matched. **No calendar integration exists.** v1 scope: piggyback on
 6b's parser for extracted time, pre-fill the existing picker, save to
 the existing column. Real calendar invites are a separate L-sized
-build parallel to this roadmap (PD-4).
+build parallel to this roadmap (PD-4 resolved 2026-05-13, see Product
+decisions section: v1 = extract + prefill only).
 
 #### 6d — Funnel-to-coffee follow-up
 
@@ -450,3 +477,5 @@ M-L ticket outside this roadmap.
 2026-05-12 — Roadmap created.
 2026-05-12 — REF-21 shipped (Issue 3): pinned chat composer, removed
 no-op Edit button, relocated edits counter to composer.
+2026-05-13 — PD-1, PD-2, PD-3, PD-4 resolved. See Product decisions
+section for outcomes.
