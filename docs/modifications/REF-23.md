@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-23-consolidated-send-flow`
 **Status:** shipped
+**Merged:** commit `2f4b315`, PR #9
 
 ## Scope
 

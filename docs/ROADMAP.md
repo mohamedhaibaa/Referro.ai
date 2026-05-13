@@ -285,7 +285,7 @@ REF-23 establishes the pattern. Detail in `/docs/modifications/REF-23.md`.
 
 #### Updates
 
-2026-05-13 — REF-23 shipped (commit `<merge-sha>`, PR #N): the
+2026-05-13 — REF-23 shipped (commit `2f4b315`, PR #9): the
 3-button post-approve row collapses into one "📨 Send message"
 button. Click → copies draft + opens LinkedIn + arms
 `visibilitychange` listener (5s debounce, 60s safety timeout) → on
