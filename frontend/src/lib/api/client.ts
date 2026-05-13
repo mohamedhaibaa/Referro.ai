@@ -19,6 +19,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
+    // REF-26: clear auth-coupled state so zombie polling against a stale
+    // workflow_run can't resurrect on the next session.
+    localStorage.removeItem("referroing:active");
     window.location.href = "/login";
     throw new Error("Unauthorized");
   }
