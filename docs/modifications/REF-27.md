@@ -2,6 +2,7 @@
 
 **Branch:** `fix/REF-27-alert-dialog-zindex`
 **Status:** shipped
+**Merged:** commit `85a06eb`, PR #13
 
 ## Scope
 
