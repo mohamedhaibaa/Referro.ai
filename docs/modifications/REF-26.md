@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-26-polling-failure-fix`
 **Status:** shipped
+**Merged:** commit `7e6bbde`, PR #12
 
 ## Scope
 
