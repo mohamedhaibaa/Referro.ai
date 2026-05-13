@@ -178,7 +178,7 @@ because there is no API path to detect real LinkedIn acceptance.
 
 #### Updates
 
-2026-05-13 — REF-25 shipped (commit `<merge-sha>`, PR #N): post-"I
+2026-05-13 — REF-25 shipped (commit `ced866e`, PR #11): post-"I
 sent the connection request" copy rewritten to greet the user by
 first name and reframe the wait honestly. Button relabeled
 "🎉 They accepted! (simulate)" → "✅ {contact_first} accepted".

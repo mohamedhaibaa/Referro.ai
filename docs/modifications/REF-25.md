@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-25-connection-pending-copy`
 **Status:** shipped
+**Merged:** commit `ced866e`, PR #11
 
 ## Scope
 
