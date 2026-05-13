@@ -167,3 +167,14 @@ button can be replaced (state transition path stays the same).
 The "🔗 Send connection request" button isn't currently gated by
 `send.isPending` — minor polish if rapid double-clicks become an
 issue.
+
+## Updates
+
+2026-05-13 — REF-29 hotfix: the `ACTION_SENT_CONNECTION` handler
+shipped here as side-effect-only (Option H-A). That broke the
+chat — `init_chat` is gated on empty chat history and does NOT
+re-fire when lifecycle changes mid-conversation, so the connected-
+state content never rendered. REF-29 restored response messages
+to the handler. The CONNECTED `init_chat` seed is unchanged (still
+correct for empty-history reopens); both surfaces now produce
+byte-identical text + button.
