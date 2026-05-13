@@ -276,6 +276,7 @@ def _generate_ref_response(
     current_state: str,
     edits_left_after: Optional[int],
     ai_result: Optional[dict] = None,
+    user: Optional[User] = None,
 ) -> RefResponse:
     """Pure: (state, action) -> Ref's reply messages + side effects.
     The handler executes side effects + persists. No DB calls in this function.
@@ -286,8 +287,14 @@ def _generate_ref_response(
 
     `ai_result` is the parsed AI response dict (keys: chat, draft, play)
     pre-computed by the handler for branches that need AI generation.
+
+    `user` is the current authenticated user; passed through from post_chat
+    so Ref's chat copy can address the user by first name (REF-25). Optional
+    only because that keeps the function signature backward-compatible for
+    any future caller that doesn't have a User in scope.
     """
     first = (contact.full_name or "there").split(" ")[0]
+    user_first = (user.name or "").split(" ")[0] if user else ""
     kind = user_action.get("kind")
     content = user_action.get("content") or {}
     action = content.get("action")
@@ -295,21 +302,23 @@ def _generate_ref_response(
     # State: not_contacted ----------------------------------------------------
 
     if current_state == NOT_CONTACTED and kind == "action" and action == ACTION_SENT_CONNECTION:
+        # REF-25: greet the user by first name; gracefully strip the comma if
+        # User.name is empty.
+        greeting = f"Nice work, {user_first}!" if user_first else "Nice work!"
+        text = (
+            f"{greeting} Connection requests usually take a day or two — "
+            f"come back here when {first} accepts and tap the button below "
+            "to let me know."
+        )
         return RefResponse(messages=[
             {
                 "role": ROLE_REF, "kind": KIND_TEXT,
-                "content": {
-                    "text": (
-                        f"Nice. Connection requests usually take a day or two — "
-                        f"I'll let you know when {first} accepts. (For demo: tap "
-                        "below to simulate acceptance.)"
-                    ),
-                },
+                "content": {"text": text},
             },
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
                 "content": {"actions": [
-                    _action("🎉 They accepted! (simulate)", ACTION_SHE_ACCEPTED, primary=True),
+                    _action(f"✅ {first} accepted", ACTION_SHE_ACCEPTED, primary=True),
                 ]},
             },
         ])
@@ -933,6 +942,7 @@ def post_chat(
         current_state=state,
         edits_left_after=edits_left_after,
         ai_result=ai_result,
+        user=current_user,
     )
 
     # --- Apply side effects ---
