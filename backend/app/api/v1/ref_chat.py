@@ -225,12 +225,14 @@ def _approve_buttons(include_undo: bool) -> dict:
     return {"actions": actions}
 
 
-def _copy_send_buttons() -> dict:
-    """Action buttons after the user clicks Looks fire (post-approve)."""
+def _send_message_button() -> dict:
+    """Single send-message button after the user clicks Looks fire (post-approve).
+    REF-23: consolidated from 3 buttons (copy / open_linkedin / mark_sent) into
+    one. The frontend's send_message handler orchestrates copy + window.open +
+    visibilitychange wait + AlertDialog confirmation, then dispatches mark_sent
+    on user confirmation."""
     return {"actions": [
-        _action("📋 Copy message", "copy", primary=False),
-        _action("🔗 Open LinkedIn", "open_linkedin", primary=False),
-        _action("✅ Mark sent", ACTION_MARK_SENT, primary=True),
+        _action("📨 Send message", "send_message", primary=True),
     ]}
 
 
@@ -378,7 +380,7 @@ def _generate_ref_response(
             text = "Let's send the follow-up. Copy it, paste into LinkedIn, then come back and hit \"Mark sent.\""
         return RefResponse(messages=[
             {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
-            {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _copy_send_buttons()},
+            {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _send_message_button()},
         ])
 
     if current_state in DRAFT_STATES and kind == "action" and action == ACTION_MARK_SENT:

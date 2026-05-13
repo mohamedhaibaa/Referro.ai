@@ -42,7 +42,8 @@ export type RefChatActionKind =
   | "draft_followup_2"
   | "undo"
   | "copy"
-  | "open_linkedin";
+  | "open_linkedin"
+  | "send_message";
 
 export interface RefChatActionDef {
   label: string;

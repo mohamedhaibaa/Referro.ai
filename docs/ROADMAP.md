@@ -248,8 +248,8 @@ and post-approve states. No backend or AI logic changes.
 
 ### Issue 4 — Send-Message Flow
 
-**Status**: Not started
-**Ticket**: (none yet)
+**Status**: Shipped
+**Ticket**: REF-23
 **Estimated complexity**: S (button consolidation + simple focus listener) → M (robust confirmation flow)
 **Dependencies**: none upstream; Issue 5 layers on top
 
@@ -263,30 +263,14 @@ sent.
 
 #### What the audit found
 
-The 3 buttons come from the state machine after `approve_draft` at
-`backend/app/api/v1/ref_chat.py:258-277`:
-
-```
-📋 Copy message     → action kind "copy"          (client-only)
-🔗 Open LinkedIn    → action kind "open_linkedin" (client-only)
-✅ Mark sent        → action kind "mark_sent"     (server-bound)
-```
-
-Copy uses `navigator.clipboard.writeText`; Open LinkedIn uses
-`window.open(contact.linkedinUrl, "_blank")` — both at
-`RefChatPanel.tsx:110-128`. Mark sent chains
-`useSendRefChat → useUpdateOutreach` at `RefChatPanel.tsx:140-164`.
-
-**LinkedIn messaging deep links require the recipient URN/conversation
-thread ID**, which we don't store. `contact.linkedin_url` is the
-public profile slug (e.g. `linkedin.com/in/sarah-chen-123`). Realistic
-v1: open the profile and the user clicks "Message."
-
-**"On user return marks sent"** is the fragile piece. No
-`visibilitychange` / focus listener exists today. Browsers fire
-`visibilitychange` for any tab switch, not specifically for "returned
-from LinkedIn." Likely needs a confirmation prompt regardless of
-auto-detection.
+3-button row emitted by `approve_draft` handler — single helper
+`_copy_send_buttons()` (renamed to `_send_message_button` in REF-23)
+in `backend/app/api/v1/ref_chat.py`. Frontend client-only handlers
+for `copy` / `open_linkedin` + server-bound `mark_sent` chain via
+`useUpdateOutreach`. **No LinkedIn messaging deep-link available** —
+we have profile URLs, not recipient URNs. **No
+`visibilitychange`/focus listener exists** in the codebase yet;
+REF-23 establishes the pattern. Detail in `/docs/modifications/REF-23.md`.
 
 #### Decisions
 
@@ -296,13 +280,21 @@ auto-detection.
 
 #### Ticket breakdown
 
-- REF-XX (TBD): "Consolidate post-approve buttons into one combined
-  send action" — S. Pure backend state-machine + frontend handler
-  change.
+- REF-23 (shipped): "Consolidate post-approve buttons into one
+  combined send action" — S, ended up ~+144 net code lines.
 
 #### Updates
 
-(Empty.)
+2026-05-13 — REF-23 shipped (commit `<merge-sha>`, PR #N): the
+3-button post-approve row collapses into one "📨 Send message"
+button. Click → copies draft + opens LinkedIn + arms
+`visibilitychange` listener (5s debounce, 60s safety timeout) → on
+return, shadcn `AlertDialog` confirms ("Did you send the message?").
+Yes dispatches `mark_sent`; Not yet / Escape resets. linkedinUrl-null
+contacts skip `window.open` and open the dialog immediately with
+adjusted copy. Backend helper renamed `_send_message_button`. Legacy
+3-button handlers preserved in `handleAction` for backward compat
+with pre-REF-23 chat histories.
 
 ---
 
@@ -496,3 +488,6 @@ section for outcomes.
 2026-05-13 — REF-22 shipped (Issue 5, conservative scope): chat
 extended to cover 5 new lifecycle states past `drafted`. Unblocks
 Issue 6.
+2026-05-13 — REF-23 shipped (Issue 4): post-approve 3-button row
+collapsed into a single "📨 Send message" with visibility-tracked
+confirmation dialog.

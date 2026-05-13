@@ -12,6 +12,16 @@ import {
   RefChatUserActionContent,
 } from "@/types/refChat";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useContactOutreach, useUpdateOutreach } from "@/hooks/useOutreach";
 import { useInitRefChat, useRefChatMessages, useSendRefChat } from "@/hooks/useRefChat";
 import { STATES } from "@/lib/contactLifecycle";
@@ -84,6 +94,19 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   const initFiredRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // REF-23: consolidated send-message flow state.
+  // sendArmed: between "Send message" click and AlertDialog answered (or 60s timeout).
+  // confirmOpen: controls the AlertDialog visibility.
+  // hiddenSinceMsRef / confirmOpenRef are refs for the visibility listener's
+  // live reads (closes-over-stale-state defense).
+  const [sendArmed, setSendArmed] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const hiddenSinceMsRef = useRef<number | null>(null);
+  const confirmOpenRef = useRef(false);
+  useEffect(() => {
+    confirmOpenRef.current = confirmOpen;
+  }, [confirmOpen]);
+
   // Auto-init on first mount when chat is empty.
   // REF-22: widened from {not_contacted, drafted} to cover all 7 chat-owned
   // states so legacy contacts (in sent/fu*_* with empty ref_chat_messages)
@@ -112,6 +135,43 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages.length, send.isPending]);
+
+  // REF-23: visibility-tracking + 60s safety timeout for the send_message flow.
+  // PD-3 spec: open AlertDialog when user returns to tab after >= 5s away.
+  // DQ-5: 60s fallback opens dialog proactively for side-by-side-window users
+  // where visibilitychange never fires.
+  useEffect(() => {
+    if (!sendArmed) return;
+    // linkedinUrl-null path: confirmOpen already true. Skip listener + timer.
+    if (confirmOpen) return;
+
+    const onVisibilityChange = () => {
+      if (confirmOpenRef.current) return;
+      if (document.hidden) {
+        hiddenSinceMsRef.current = Date.now();
+      } else {
+        const startedAt = hiddenSinceMsRef.current;
+        if (startedAt === null) return;
+        const elapsed = Date.now() - startedAt;
+        if (elapsed >= 5000) {
+          setConfirmOpen(true);
+        } else {
+          // Quick tab switch — reset for potential next round.
+          hiddenSinceMsRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    const timeoutId = window.setTimeout(() => {
+      if (!confirmOpenRef.current) setConfirmOpen(true);
+    }, 60_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.clearTimeout(timeoutId);
+    };
+  }, [sendArmed, confirmOpen]);
 
   // Latest draft_card drives the input's edits_left + disabled state.
   const latestDraftCard = useMemo<RefChatDraftContent | null>(() => {
@@ -149,9 +209,12 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   const editorDisabled = !editorVisible || editsLeft <= 0 || send.isPending;
 
   // --- Action dispatcher ---
-  // Handles client-only buttons (copy / open_linkedin) inline, routes
-  // server-bound buttons through useSendRefChat. The "Mark sent" branch
+  // Handles client-only buttons (copy / open_linkedin / send_message) inline,
+  // routes server-bound buttons through useSendRefChat. The "Mark sent" branch
   // chains useUpdateOutreach to PATCH sent_at — the canonical lifecycle path.
+  // REF-23 adds the consolidated `send_message` orchestration. The legacy
+  // `copy` and `open_linkedin` handlers are kept for backward compatibility
+  // with pre-REF-23 action_buttons rows in chat history.
   const handleAction = (actionKind: string) => {
     if (actionKind === "copy") {
       const text = latestDraftCard?.text ?? "";
@@ -168,6 +231,34 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
     if (actionKind === "open_linkedin") {
       if (contact.linkedinUrl) {
         window.open(contact.linkedinUrl, "_blank", "noopener,noreferrer");
+      }
+      return;
+    }
+
+    // REF-23: consolidated send flow. Copies the draft, opens LinkedIn,
+    // arms the visibility-tracking effect, and (when no LinkedIn URL is
+    // available — DQ-3) immediately opens the confirmation dialog.
+    if (actionKind === "send_message") {
+      const text = latestDraftCard?.text ?? "";
+      if (!text) {
+        toast.error("Nothing to send yet.");
+        return;
+      }
+      navigator.clipboard
+        .writeText(text)
+        .then(() => toast.success("Copied to clipboard"))
+        .catch(() => toast.error("Couldn't copy to clipboard."));
+
+      const hasLinkedInUrl = !!contact.linkedinUrl;
+      if (hasLinkedInUrl) {
+        window.open(contact.linkedinUrl!, "_blank", "noopener,noreferrer");
+      }
+
+      hiddenSinceMsRef.current = null;
+      setSendArmed(true);
+      if (!hasLinkedInUrl) {
+        // No tab-switch will happen; prompt immediately.
+        setConfirmOpen(true);
       }
       return;
     }
@@ -218,6 +309,20 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
     }
   };
 
+  // REF-23: dialog answer handlers.
+  // State reset MUST run before handleAction("mark_sent") to prevent any race
+  // where send.mutate fires while sendArmed is still true.
+  const handleConfirmSent = () => {
+    setConfirmOpen(false);
+    setSendArmed(false);
+    handleAction("mark_sent");
+  };
+
+  const handleNotYet = () => {
+    setConfirmOpen(false);
+    setSendArmed(false);
+  };
+
   const handleSendDraft = () => {
     const text = draftInput.trim();
     if (!text || editorDisabled) return;
@@ -248,10 +353,36 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
             message={m}
             onAction={handleAction}
             disabled={send.isPending || updateOutreach.isPending}
+            sendArmed={sendArmed}
           />
         ))}
         {(send.isPending || updateOutreach.isPending) && <TypingIndicator />}
       </div>
+
+      {/* REF-23: send-message confirmation. Escape calls onOpenChange(false)
+          which routes to handleNotYet (DQ-2). Outside-click is blocked by
+          shadcn AlertDialog default. */}
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => { if (!open) handleNotYet(); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Did you send the message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {contact.linkedinUrl
+                ? "Click Yes once the DM is sent on LinkedIn. We'll mark it as sent."
+                : "Send the message manually on LinkedIn, then come back."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleNotYet}>Not yet</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSent}>
+              Yes, sent
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {editorVisible && (
         <div className="border-t border-border pt-3 mt-3 space-y-1.5">
@@ -299,9 +430,10 @@ interface RowProps {
   message: RefChatMessage;
   onAction: (kind: string) => void;
   disabled: boolean;
+  sendArmed: boolean;
 }
 
-const ChatMessageRow = ({ message, onAction, disabled }: RowProps) => {
+const ChatMessageRow = ({ message, onAction, disabled, sendArmed }: RowProps) => {
   if (message.role === "user") {
     if (message.kind === "text") {
       return <UserBubble text={(message.content as RefChatTextContent).text} />;
@@ -327,6 +459,7 @@ const ChatMessageRow = ({ message, onAction, disabled }: RowProps) => {
           actions={(message.content as RefChatActionsContent).actions}
           onClick={onAction}
           disabled={disabled}
+          sendArmed={sendArmed}
         />
       );
     default:
@@ -420,25 +553,33 @@ interface ActionButtonsProps {
   actions: RefChatActionDef[];
   onClick: (kind: string) => void;
   disabled: boolean;
+  sendArmed: boolean;
 }
 
-const ActionButtons = ({ actions, onClick, disabled }: ActionButtonsProps) => (
+const ActionButtons = ({ actions, onClick, disabled, sendArmed }: ActionButtonsProps) => (
   <div className="ml-9 flex flex-wrap gap-2">
-    {actions.map((a, i) => (
-      <button
-        key={`${a.kind}-${i}`}
-        type="button"
-        onClick={() => onClick(a.kind)}
-        disabled={disabled}
-        className={
-          a.primary
-            ? "px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-            : "px-4 py-2 rounded-full border border-border text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        }
-      >
-        {a.label}
-      </button>
-    ))}
+    {actions.map((a, i) => {
+      // REF-23 DQ-11: while the send_message flow is armed, disable the
+      // send_message button and prepend a Loader2 spinner. Matches the
+      // composer-send spinner pattern at line ~392.
+      const isSendArmedTarget = sendArmed && a.kind === "send_message";
+      return (
+        <button
+          key={`${a.kind}-${i}`}
+          type="button"
+          onClick={() => onClick(a.kind)}
+          disabled={disabled || isSendArmedTarget}
+          className={
+            a.primary
+              ? "inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+              : "inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-border text-sm text-foreground hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          }
+        >
+          {isSendArmedTarget && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+          {a.label}
+        </button>
+      );
+    })}
   </div>
 );
 
