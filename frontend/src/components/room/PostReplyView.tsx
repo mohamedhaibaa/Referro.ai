@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -31,25 +31,68 @@ import ActivityTimeline from "./ActivityTimeline";
 import CelebrationView from "./CelebrationView";
 import OutcomeDialog from "./OutcomeDialog";
 
+// REF-30 (DQ-9): externally-driveable mode signal. REF-30's chat bridge
+// passes `mode` to auto-open the relevant picker / dialog; subsequent
+// internal mode changes notify the parent via onModeChange so it can
+// clear its forcedView state.
+export type PostReplyMode = "coffee_chat" | "interview" | "outcome" | null;
+
 interface PostReplyViewProps {
   job: Job;
   contact: Contact;
   messages: OutreachMessage[];
   onUndo: () => void;
   onClose: () => void;
+  mode?: PostReplyMode;                       // REF-30: external drive signal
+  onModeChange?: (mode: PostReplyMode) => void;  // REF-30
 }
 
 type ScheduleMode = "coffee_chat" | "interview";
 
-const PostReplyView = ({ job, contact, messages, onUndo, onClose }: PostReplyViewProps) => {
+const PostReplyView = ({
+  job, contact, messages, onUndo, onClose, mode, onModeChange,
+}: PostReplyViewProps) => {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const status = contact.lifecycleStatus ?? STATES.REPLIED;
 
-  const [outcomeOpen, setOutcomeOpen] = useState(false);
-  const [scheduleMode, setScheduleMode] = useState<ScheduleMode | null>(null);
-  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
+  // Seed internal state from `mode` prop on initial mount (handles the
+  // REF-30 bridge case where the popup opens PostReplyView with a
+  // pre-set scheduling picker / outcome dialog).
+  const [outcomeOpen, setOutcomeOpen] = useState<boolean>(mode === "outcome");
+  const [scheduleMode, setScheduleMode] = useState<ScheduleMode | null>(
+    mode === "coffee_chat" || mode === "interview" ? mode : null,
+  );
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(
+    mode === "coffee_chat" || mode === "interview" ? new Date() : undefined,
+  );
   const [scheduleTime, setScheduleTime] = useState<string>("10:00");
+
+  // External mode changes (parent flips `mode` mid-life) re-seed internal state.
+  useEffect(() => {
+    if (mode === undefined) return;  // uncontrolled by parent — keep internal state
+    if (mode === "coffee_chat" || mode === "interview") {
+      setScheduleMode(mode);
+      setScheduleDate(new Date());
+      setScheduleTime("10:00");
+      setOutcomeOpen(false);
+    } else if (mode === "outcome") {
+      setOutcomeOpen(true);
+      setScheduleMode(null);
+    } else {
+      // mode === null: clear both
+      setScheduleMode(null);
+      setOutcomeOpen(false);
+    }
+  }, [mode]);
+
+  // Notify parent of internal mode changes (so parent can clear forcedView
+  // after the user dismisses or completes the action).
+  useEffect(() => {
+    if (!onModeChange) return;
+    const current: PostReplyMode = scheduleMode ?? (outcomeOpen ? "outcome" : null);
+    onModeChange(current);
+  }, [scheduleMode, outcomeOpen, onModeChange]);
 
   const patch = useMutation({
     mutationFn: (body: Parameters<typeof patchContact>[2]) =>

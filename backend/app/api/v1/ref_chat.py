@@ -24,10 +24,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.v1.outreach import CONNECTED, NOT_CONTACTED, _recompute_and_persist
-from app.db.models.job import Contact, Job, OutreachMessage, RefChatMessage
+from app.db.models.job import Contact, ContactReply, Job, OutreachMessage, RefChatMessage
 from app.db.models.user import User
 from app.db.session import get_db
-from app.services.ref_ai import generate_initial_draft, revise_draft
+from app.prompts.intent_taxonomy import INTENT_CATEGORIES, INTENT_TO_LABEL
+from app.services.ref_ai import generate_initial_draft, parse_reply, revise_draft
 
 router = APIRouter()
 
@@ -45,6 +46,8 @@ KIND_INTEL = "intel_card"
 KIND_DRAFT = "draft_card"
 KIND_ACTIONS = "action_buttons"
 KIND_USER_ACTION = "action"  # user-side echo of a button press
+KIND_REPLY_PASTE = "reply_paste"               # REF-30 (user-role): pasted contact reply
+KIND_REPLY_CLASSIFICATION = "reply_classification"  # REF-30 (ref-role): classification chip
 
 ACTION_SENT_CONNECTION = "sent_connection_request"
 ACTION_SHE_ACCEPTED = "she_accepted"
@@ -72,6 +75,7 @@ FU1_DRAFTED = "followup_1_drafted"
 FU1_SENT = "followup_1_sent"
 FU2_DRAFTED = "followup_2_drafted"
 FU2_SENT = "followup_2_sent"
+REPLIED = "replied"  # REF-30: chat-owned post-reply state
 
 DRAFT_STATES = {DRAFTED, FU1_DRAFTED, FU2_DRAFTED}
 SENT_STATES = {SENT, FU1_SENT, FU2_SENT}
@@ -103,7 +107,7 @@ def _validation_error(action: str, state: str) -> HTTPException:
 # --- Request body ---
 
 class RefChatPostRequest(BaseModel):
-    kind: Literal["text", "action"]
+    kind: Literal["text", "action", "reply_paste"]  # REF-30: + reply_paste
     content: dict
     edits_left: Optional[int] = None  # client hint, server re-derives
 
@@ -151,6 +155,20 @@ class UndoReplied:
 
 
 @dataclass
+class CaptureReply:
+    """REF-30: persist a ContactReply row + set replied_at on the contact.
+
+    `parsed` carries the parse_reply output (intent_category, confidence,
+    extracted_data, chat_message, reasoning). The reply_text is the raw
+    pasted text; persisted separately on the row AND as a user-role
+    KIND_REPLY_PASTE chat message via the standard _persist_user_message
+    path.
+    """
+    reply_text: str
+    parsed: dict
+
+
+@dataclass
 class MarkConnected:
     """REF-28: PATCH contact.connected_at = now() and recompute.
     Triggers lifecycle transition not_contacted -> connected when the user
@@ -166,6 +184,7 @@ SideEffect = Union[
     UndoSent,
     UndoReplied,
     MarkConnected,
+    CaptureReply,  # REF-30
 ]
 
 
@@ -531,6 +550,23 @@ def _generate_ref_response(
             side_effects=[CreateOutreach(type="followup_2", text=stub)],
         )
 
+    # State: replied (REF-30) ------------------------------------------------
+
+    if current_state == REPLIED and kind == "action" and action == ACTION_UNDO:
+        # Cleared replied_at → cascade reverts to whichever sent state the
+        # OutreachMessage timestamps imply (sent / fu1_sent / fu2_sent).
+        # No fresh action_buttons emitted; init_chat's SENT_STATES seed
+        # covers the post-undo UI on next render.
+        return RefResponse(
+            messages=[
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {"text": "Undone — back to waiting for their reply."},
+                },
+            ],
+            side_effects=[UndoReplied()],
+        )
+
     if current_state in SENT_STATES and kind == "action" and action == ACTION_UNDO:
         # Clears sent_at on the current sent-state OutreachMessage.
         # _recompute_and_persist will revert lifecycle to the matching
@@ -550,6 +586,63 @@ def _generate_ref_response(
 
     # No-op fallthrough (shouldn't be reached given handler-side validation).
     return RefResponse()
+
+
+def _generate_reply_capture_response(
+    contact: Contact,
+    reply_text: str,
+    parsed: dict,
+) -> RefResponse:
+    """REF-30: emits chat content for a captured reply.
+
+    Generic across categories (REF-31 will specialize per category). Always
+    emits:
+      1. Classification chip (KIND_REPLY_CLASSIFICATION) — low-emphasis,
+         shows label + confidence to the user
+      2. Ref text (KIND_TEXT) — generic "Saved their reply. Classified as: …"
+      3. Action buttons (KIND_ACTIONS) — special-cased for yes_to_coffee_chat
+         (☕ Schedule coffee chat bridges to PostReplyView)
+
+    The user's pasted reply text is persisted separately as a user-role
+    KIND_REPLY_PASTE message via the standard _persist_user_message path
+    in post_chat. We don't emit it from here.
+
+    The CaptureReply side effect inserts the ContactReply row + sets
+    replied_at + recomputes lifecycle (sent / fu*_sent → replied).
+    """
+    intent = parsed.get("intent_category", "uncategorized")
+    confidence = parsed.get("confidence", "low")
+    label = INTENT_TO_LABEL.get(intent, INTENT_TO_LABEL["uncategorized"])
+
+    text = f"Saved their reply. Classified as: {label} ({confidence} confidence)."
+
+    if intent == "yes_to_coffee_chat":
+        actions = [
+            _action("☕ Schedule coffee chat", "switch_to_schedule_coffee_chat", primary=True),
+            _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+            _action("↩ Undo replied", ACTION_UNDO, primary=False),
+        ]
+    else:
+        actions = [
+            _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+            _action("↩ Undo replied", ACTION_UNDO, primary=False),
+        ]
+
+    return RefResponse(
+        messages=[
+            {
+                "role": ROLE_REF, "kind": KIND_REPLY_CLASSIFICATION,
+                "content": {
+                    "label": label,
+                    "intent": intent,
+                    "confidence": confidence,
+                },
+            },
+            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+            {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": {"actions": actions}},
+        ],
+        side_effects=[CaptureReply(reply_text=reply_text, parsed=parsed)],
+    )
 
 
 # --- DB helpers ---
@@ -855,11 +948,73 @@ def init_chat(
                 "content": _sent_state_buttons(state),
             },
         ]
+    elif state == REPLIED:
+        # REF-30: two cases for legacy contacts (no chat history yet):
+        #   (a) No ContactReply row — show active-paste prompt + composer.
+        #   (b) ContactReply exists (chat history wiped, but reply was captured
+        #       previously) — reconstruct the post-reply view from saved data.
+        last_reply = (
+            db.query(ContactReply)
+            .filter(ContactReply.contact_id == contact.id)
+            .order_by(ContactReply.created_at.desc())
+            .first()
+        )
+        if last_reply is None:
+            # Case (a): active paste prompt
+            seed = [
+                intel,
+                {
+                    "role": ROLE_REF, "kind": KIND_TEXT,
+                    "content": {
+                        "text": (
+                            f"Looks like {first} replied earlier — but I don't "
+                            "have the text. Paste it below for me to classify, "
+                            "or pick what fits."
+                        ),
+                    },
+                },
+                {
+                    "role": ROLE_REF, "kind": KIND_ACTIONS,
+                    "content": {"actions": [
+                        _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+                        _action("↩ Undo replied", ACTION_UNDO, primary=False),
+                    ]},
+                },
+            ]
+        else:
+            # Case (b): reconstruct from saved classification
+            intent = last_reply.classified_intent or "uncategorized"
+            confidence = last_reply.classification_confidence or "low"
+            label = INTENT_TO_LABEL.get(intent, INTENT_TO_LABEL["uncategorized"])
+            recon_text = f"They replied. Classified as: {label} ({confidence} confidence)."
+            if intent == "yes_to_coffee_chat":
+                recon_actions = [
+                    _action("☕ Schedule coffee chat", "switch_to_schedule_coffee_chat", primary=True),
+                    _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+                    _action("↩ Undo replied", ACTION_UNDO, primary=False),
+                ]
+            else:
+                recon_actions = [
+                    _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+                    _action("↩ Undo replied", ACTION_UNDO, primary=False),
+                ]
+            seed = [
+                intel,
+                {
+                    "role": ROLE_USER, "kind": KIND_REPLY_PASTE,
+                    "content": {"text": last_reply.reply_text},
+                },
+                {
+                    "role": ROLE_REF, "kind": KIND_REPLY_CLASSIFICATION,
+                    "content": {"label": label, "intent": intent, "confidence": confidence},
+                },
+                {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": recon_text}},
+                {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": {"actions": recon_actions}},
+            ]
     else:
-        # replied / coffee_chat_* / interview_* / outcome_* — out of REF-22 scope.
-        # Per DD-A, these route to PostReplyView via ContactPopup's conditional.
-        # init_chat shouldn't be called for them (the conditional excludes them),
-        # but stay defensive: clear 400 with a state-specific message.
+        # coffee_chat_* / interview_* / outcome_* — still out of chat scope.
+        # ContactPopup's conditional routes these to PostReplyView. init_chat
+        # shouldn't be called for them, but stay defensive.
         raise HTTPException(
             status_code=400,
             detail=f"Chat init not supported for state {state!r}",
@@ -921,10 +1076,11 @@ def post_chat(
             raise _validation_error(action, state)
         if action == ACTION_DRAFT_FOLLOWUP_2 and state != FU1_SENT:
             raise _validation_error(action, state)
-        if action == ACTION_UNDO and state not in (SENT_STATES | {FU1_DRAFTED, FU2_DRAFTED}):
+        if action == ACTION_UNDO and state not in (SENT_STATES | {FU1_DRAFTED, FU2_DRAFTED} | {REPLIED}):
             # Undo from `drafted` is intentionally NOT supported in REF-22 —
-            # it would revert to not_contacted and interact with the missing
-            # `connected` lifecycle state (PD-1 / Issue 1).
+            # it would revert to not_contacted and interact with the
+            # `connected` lifecycle state (PD-1 / Issue 1). REF-30 widens
+            # to accept REPLIED (clears replied_at).
             raise _validation_error(action, state)
 
     elif kind == "text":
@@ -933,6 +1089,14 @@ def post_chat(
             raise HTTPException(status_code=400, detail="text content cannot be empty")
         if state not in DRAFT_STATES:
             raise _validation_error("text_edit", state)
+
+    elif kind == "reply_paste":
+        # REF-30: pasted contact reply, accepted in SENT_STATES only.
+        text_val = (content.get("text") or "").strip()
+        if not text_val:
+            raise HTTPException(status_code=400, detail="reply text cannot be empty")
+        if state not in SENT_STATES:
+            raise _validation_error("reply_paste", state)
 
     else:
         # Pydantic Literal already enforces this; defensive only.
@@ -983,19 +1147,37 @@ def post_chat(
             current_draft, user_instruction, edit_number,
         )
 
+    elif kind == "reply_paste":
+        # REF-30: classify the pasted reply. parse_reply has its own try/except
+        # fallback (returns uncategorized-low on failure) so the chat continues
+        # even when AI is down.
+        reply_text_val = (content.get("text") or "").strip()
+        job = _load_job_owned(job_id, current_user, db)
+        ai_result = parse_reply(contact, job, current_user, reply_text_val)
+
     # --- Persist user message ---
     user_row = _persist_user_message(db, contact, body)
     db.flush()
 
-    # --- Generate Ref's response (pure) ---
-    response = _generate_ref_response(
-        contact=contact,
-        user_action={"kind": kind, "content": content},
-        current_state=state,
-        edits_left_after=edits_left_after,
-        ai_result=ai_result,
-        user=current_user,
-    )
+    # --- Generate Ref's response ---
+    # REF-30: reply_paste skips the main pure state machine and uses its own
+    # response generator (which always emits classification chip + generic
+    # text + per-category action buttons).
+    if kind == "reply_paste":
+        response = _generate_reply_capture_response(
+            contact=contact,
+            reply_text=(content.get("text") or "").strip(),
+            parsed=ai_result or {},
+        )
+    else:
+        response = _generate_ref_response(
+            contact=contact,
+            user_action={"kind": kind, "content": content},
+            current_state=state,
+            edits_left_after=edits_left_after,
+            ai_result=ai_result,
+            user=current_user,
+        )
 
     # --- Apply side effects ---
     for se in response.side_effects:
@@ -1054,18 +1236,38 @@ def post_chat(
             _recompute_and_persist(contact, db)
             # sent -> drafted; fu1_sent -> fu1_drafted; fu2_sent -> fu2_drafted
         elif isinstance(se, UndoReplied):
-            # Reserved for a future ticket that brings replied into chat.
-            # Defensive: should never be produced by REF-22 code paths.
-            raise HTTPException(
-                status_code=500,
-                detail="UndoReplied is reserved — no REF-22 branch emits it",
-            )
+            # REF-22 reserved this descriptor; REF-30 activated it for the
+            # undo path from REPLIED. Clears replied_at; cascade reverts
+            # to whichever sent state the OutreachMessage timestamps imply.
+            contact.replied_at = None
+            db.flush()
+            _recompute_and_persist(contact, db)
+            # replied -> sent / fu1_sent / fu2_sent
         elif isinstance(se, MarkConnected):
             # REF-28: not_contacted -> connected. Datetime is the only state
             # the cascade reads for this transition; no OutreachMessage is created.
             contact.connected_at = datetime.now(timezone.utc)
             db.flush()
             _recompute_and_persist(contact, db)
+        elif isinstance(se, CaptureReply):
+            # REF-30: persist ContactReply row + set replied_at + recompute cascade.
+            # parsed dict carries intent_category, confidence, extracted_data,
+            # chat_message, reasoning. raw_ai_response is the full parsed dict
+            # (preserves chat_message + reasoning for offline evaluation).
+            reply_row = ContactReply(
+                contact_id=contact.id,
+                user_id=contact.user_id,
+                reply_text=se.reply_text,
+                classified_intent=se.parsed.get("intent_category", "uncategorized"),
+                classification_confidence=se.parsed.get("confidence", "low"),
+                extracted_data=se.parsed.get("extracted_data") or {},
+                raw_ai_response=se.parsed,
+            )
+            db.add(reply_row)
+            contact.replied_at = datetime.now(timezone.utc)
+            db.flush()
+            _recompute_and_persist(contact, db)
+            # sent / fu1_sent / fu2_sent -> replied
 
     # --- Persist Ref's messages ---
     ref_rows = _persist_ref_messages(db, contact, response.messages)

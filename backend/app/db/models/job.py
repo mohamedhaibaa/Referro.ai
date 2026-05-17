@@ -297,6 +297,39 @@ class WorkflowRun(Base):
     )
 
 
+class ContactReply(Base):
+    """REF-30: inbound reply text captured + classified by parse_reply.
+
+    One row per pasted reply. Allows multiple replies per contact over
+    time; the latest row by created_at is the operative one for lifecycle.
+
+    `classified_intent` is one of 10 categories from
+    /docs/research/coffee_chat_conversion.md §4 (also enumerated in
+    backend/app/prompts/intent_taxonomy.py). `extracted_data` holds
+    category-specific structured data. `raw_ai_response` is preserved
+    for offline evaluation and prompt-quality debugging.
+    """
+    __tablename__ = "contact_replies"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("contacts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    reply_text: Mapped[str] = mapped_column(Text, nullable=False)
+    classified_intent: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    classification_confidence: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    extracted_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    raw_ai_response: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    __table_args__ = (
+        Index("contact_replies_contact_id_idx", "contact_id", "created_at"),
+    )
+
+
 class RefChatMessage(Base):
     __tablename__ = "ref_chat_messages"
 

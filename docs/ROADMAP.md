@@ -376,40 +376,39 @@ sub-tickets now unblocked.
 Issue 6 splits into **3 tickets**:
 
 - **Ticket A** (covers 6a + 6b): Reply capture + AI reply parsing.
-  **M complexity. Deps: Issue 5.**
+  **REF-30 shipped 2026-05-17** — capture + classify + generic chat
+  response. Per-category intelligence (Ref text variants, per-category
+  placeholder drafts, apply-and-confirm flow) carved out to REF-31.
+  Sized L, not M (original estimate was M; honest +753 net code lines).
 - **Ticket B** (covers 6c, v1 scope): Extract proposed time + prefill
-  coffee chat picker. **S complexity. Deps: Issue 5, Ticket A.**
+  coffee chat picker. **S complexity. Deps: Ticket A.** REF-31 will
+  also fold in the per-category specialization from REF-30's carve-out.
   Real calendar invite work is deliberately deferred (see PD-4).
 - **Ticket C** (covers 6d + 6e): AI follow-up generation + coffee
-  chat prep button. **M complexity. Deps: Issue 5, Ticket A.**
+  chat prep button. **M complexity. Deps: Ticket A.**
 
-Per-sub-issue audit findings:
+Per-sub-issue status:
 
-#### 6a — Reply capture in chat
+#### 6a — Reply capture in chat — **Shipped (REF-30)**
 
-After mark-sent, today's reply affordance is the legacy
-`MessageDraftView` "They replied" button
-(`frontend/src/components/room/MessageDraftView.tsx:192-198`) which
-PATCHes `replied_at = now()` via `setContactRepliedAt`
-(`ContactPopup.tsx:31-41`). **The reply text is never captured or
-stored.** `OutreachMessage` (`backend/app/db/models/job.py:100-110`)
-models only outbound messages. Minimum viable approach: repurpose
-the existing text-edit branch at `backend/app/api/v1/ref_chat.py:226-256`;
-capture reply text in `ref_chat_messages` only; defer schema changes.
-Decision needed: persist replies first-class (new column / table) or
-keep as chat-history audit trail.
+Composer in `SENT_STATES` accepts a pasted reply via
+`POST /ref-chat` with `kind="reply_paste"`. Persists a `ContactReply`
+row (new table, migration `n4o5p6q7r8s9` applied to Azure prod) with
+reply text + classification metadata. Sets `contact.replied_at`,
+cascade transitions to `replied`. `replied` is now in
+`CHAT_OWNED_STATES`. Detail in `/docs/modifications/REF-30.md`.
 
-#### 6b — AI reply parsing
+#### 6b — AI reply parsing — **Shipped (REF-30)**
 
-**Nothing exists.** `backend/app/services/ref_ai.py` has only
-`generate_initial_draft` (`:65-97`) and `revise_draft` (`:99-136`).
-The system prompt already covers the work conceptually — Section 6
-"Meeting-Funnel Moves" in
-`backend/app/prompts/ref_system_prompt.py:97-117` specifies pivots per
-reply pattern. `build_ref_context`
-(`backend/app/prompts/ref_context.py:96-196`) already structures
-per-call context. Missing: a `parse_reply` AI function + JSON schema
-(intent enum, extracted time, suggested next message).
+New `parse_reply` AI function in `backend/app/services/ref_ai.py`
+classifies into 10 intent categories (per
+`/docs/research/coffee_chat_conversion.md §4`) with confidence
+levels. New system prompt at
+`backend/app/prompts/reply_classifier.py`. Shared taxonomy module
+at `backend/app/prompts/intent_taxonomy.py` (DQ-8) is imported by
+both `ref_ai.py` and `ref_chat.py`. Temperature 0.2 for
+determinism. Try/except fallback returns uncategorized-low on AI
+failure; reply text still saved.
 
 #### 6c — Coffee chat scheduling
 
@@ -492,3 +491,11 @@ greets the user by first name; simulate button relabeled.
 2026-05-13 — REF-28 shipped (Issue 1): new `connected` lifecycle
 state + connection-request deep link. Schema migration applied to
 Azure prod. REF-25 supersession noted in its mod record.
+2026-05-17 — REF-30 shipped (Issue 6a + 6b): chat-native reply
+capture in SENT_STATES + parse_reply AI classification into 10 intent
+categories. New `contact_replies` table (migration `n4o5p6q7r8s9`
+applied to Azure prod). `replied` joined CHAT_OWNED_STATES;
+PostReplyView gained controllable `mode`/`onModeChange` props for the
+chat → scheduling bridge. Per-category intelligence + per-category
+placeholder drafts + apply-and-confirm flow carved out to REF-31.
+Sized L (not M as originally estimated; +753 net code lines).
