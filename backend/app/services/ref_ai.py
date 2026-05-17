@@ -136,6 +136,115 @@ def revise_draft(
         }
 
 
+def _build_contact_summary_for_classification(contact: Contact, job: "object") -> str:
+    """REF-30: tight contact+job summary for the classifier prompt.
+    Smaller than build_ref_context — no chat history needed for classification."""
+    first = (contact.full_name or "there").split(" ")[0]
+    return (
+        f"## Contact\n"
+        f"- Name: {contact.full_name or 'Unknown'} (first: {first})\n"
+        f"- Title: {contact.title or 'Unknown'}\n"
+        f"- Company: {contact.company or 'Unknown'}\n\n"
+        f"## Job\n"
+        f"- Title: {getattr(job, 'title', 'Unknown')}\n"
+        f"- Company: {getattr(job, 'company', 'Unknown')}\n"
+    )
+
+
+def _call_ai_foundry_with_temp(system_prompt: str, user_message: str, temperature: float = 0.7) -> str:
+    """REF-30: variant of _call_ai_foundry with configurable temperature.
+    Classification wants 0.2 (deterministic); generation stays at 0.7.
+    Kept as a separate function so the existing _call_ai_foundry contract
+    doesn't change (no behavior shift for generate_initial_draft / revise_draft)."""
+    endpoint = settings.AI_FOUNDRY_ENDPOINT.rstrip("/")
+    url = (
+        f"{endpoint}/openai/deployments/{DEPLOYMENT}"
+        f"/chat/completions?api-version={API_VERSION}"
+    )
+    headers = {"api-key": settings.AI_FOUNDRY_API_KEY, "Content-Type": "application/json"}
+    payload = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        "temperature": temperature,
+    }
+    resp = httpx.post(url, headers=headers, json=payload, timeout=_TIMEOUT)
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def parse_reply(
+    contact: Contact,
+    job: "object",
+    user: User,
+    reply_text: str,
+) -> dict:
+    """REF-30: classify the contact's reply into one of 10 intent categories.
+
+    Returns:
+        {
+          "intent_category": str,   # one of INTENT_CATEGORIES; "uncategorized" if uncertain
+          "confidence": str,        # "low" | "med" | "high"
+          "extracted_data": dict,   # category-specific; {} if none
+          "chat_message": str,      # Ref's Voice-1 acknowledgment (fallback)
+          "reasoning": str,         # short rationale, surfaced in raw_ai_response only
+        }
+
+    Failure mode: any exception (AI down, timeout, invalid JSON, missing keys,
+    unknown intent value) returns the uncategorized-low fallback. The handler
+    still saves the reply text + sets replied_at — the classification is
+    best-effort metadata.
+
+    Token / cost (gpt-4o-mini): ~$0.0004/call. Temperature 0.2 for determinism.
+    """
+    from app.prompts.intent_taxonomy import INTENT_CATEGORIES, VALID_CONFIDENCE_LEVELS
+    from app.prompts.reply_classifier import REPLY_CLASSIFIER_SYSTEM_PROMPT
+
+    contact_summary = _build_contact_summary_for_classification(contact, job)
+    user_message = (
+        f"{contact_summary}\n\n"
+        f"## Contact's reply\n<reply>\n{reply_text}\n</reply>\n\n"
+        "Classify and return JSON."
+    )
+
+    try:
+        raw = _call_ai_foundry_with_temp(
+            REPLY_CLASSIFIER_SYSTEM_PROMPT,
+            user_message,
+            temperature=0.2,
+        )
+        parsed = _parse_ref_response(raw)
+        for key in ("intent_category", "confidence", "chat_message"):
+            if key not in parsed:
+                raise ValueError(f"Missing required key in parse_reply response: {key}")
+        # Coerce unknown enum values to uncategorized/low rather than trust the AI blindly.
+        if parsed["intent_category"] not in INTENT_CATEGORIES:
+            logger.warning(
+                "parse_reply returned unknown intent_category=%r; coercing to uncategorized",
+                parsed["intent_category"],
+            )
+            parsed["intent_category"] = "uncategorized"
+            parsed["confidence"] = "low"
+        if parsed["confidence"] not in VALID_CONFIDENCE_LEVELS:
+            parsed["confidence"] = "low"
+        parsed.setdefault("extracted_data", {})
+        parsed.setdefault("reasoning", "")
+        return parsed
+    except Exception:
+        logger.exception("parse_reply failed, using uncategorized fallback")
+        return {
+            "intent_category": "uncategorized",
+            "confidence": "low",
+            "extracted_data": {},
+            "chat_message": (
+                "Saved their reply. The classifier wasn't confident — "
+                "pick what fits."
+            ),
+            "reasoning": "AI classification failed; defaulted to uncategorized.",
+        }
+
+
 def _fallback_draft(contact: Contact) -> dict:
     """Template fallback when AI is unavailable."""
     first = (contact.full_name or "there").split(" ")[0]

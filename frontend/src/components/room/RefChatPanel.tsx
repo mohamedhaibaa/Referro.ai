@@ -8,9 +8,12 @@ import {
   RefChatDraftContent,
   RefChatIntelContent,
   RefChatMessage,
+  RefChatReplyClassificationContent,
+  RefChatReplyPasteContent,
   RefChatTextContent,
   RefChatUserActionContent,
 } from "@/types/refChat";
+import type { PostReplyMode } from "./PostReplyView";
 import { Textarea } from "@/components/ui/textarea";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import {
@@ -33,6 +36,10 @@ interface RefChatPanelProps {
   contact: Contact;
   job: Job;
   onTransitionToSent: () => void;
+  // REF-30: bridge for chat actions that need to swap the popup body to
+  // PostReplyView (scheduling pickers, outcome dialog). Optional so older
+  // call sites don't break.
+  onRequestLegacyView?: (mode: PostReplyMode) => void;
 }
 
 /**
@@ -59,7 +66,7 @@ const STATE_TO_OUTREACH_TYPE: Record<string, "initial" | "followup_1" | "followu
   [STATES.FOLLOWUP_2_SENT]: "followup_2",
 };
 
-const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) => {
+const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }: RefChatPanelProps) => {
   const status = contact.lifecycleStatus ?? STATES.NOT_CONTACTED;
   const jobId = job.id;
   const contactId = contact.id;
@@ -125,7 +132,8 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
       status !== STATES.FOLLOWUP_1_DRAFTED &&
       status !== STATES.FOLLOWUP_1_SENT &&
       status !== STATES.FOLLOWUP_2_DRAFTED &&
-      status !== STATES.FOLLOWUP_2_SENT
+      status !== STATES.FOLLOWUP_2_SENT &&
+      status !== STATES.REPLIED  // REF-30
     ) return;
     if (initChat.isPending) return;
     initFiredRef.current = true;
@@ -194,14 +202,38 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   }, [messages]);
 
   const editsLeft = latestDraftCard?.edits_left ?? 0;
-  // DD-F: composer renders for drafted / fu1_drafted / fu2_drafted, hidden in
-  // every other state (no draft = no editor activity).
+  // REF-30: composer visibility now also covers SENT_STATES (always, for
+  // reply paste) and REPLIED (only when no reply has been captured yet —
+  // the legacy backward-compat path that prompts the user to paste).
+  const hasCapturedReply = useMemo(
+    () => messages.some((m) => m.kind === "reply_paste"),
+    [messages],
+  );
+  const inSentState =
+    status === STATES.SENT ||
+    status === STATES.FOLLOWUP_1_SENT ||
+    status === STATES.FOLLOWUP_2_SENT;
+  const inDraftState =
+    status === STATES.DRAFTED ||
+    status === STATES.FOLLOWUP_1_DRAFTED ||
+    status === STATES.FOLLOWUP_2_DRAFTED;
   const editorVisible =
-    (status === STATES.DRAFTED ||
-      status === STATES.FOLLOWUP_1_DRAFTED ||
-      status === STATES.FOLLOWUP_2_DRAFTED) &&
-    !draftApproved;
-  const editorDisabled = !editorVisible || editsLeft <= 0 || send.isPending;
+    (inDraftState && !draftApproved)
+    || inSentState
+    || (status === STATES.REPLIED && !hasCapturedReply);
+  // Edits-left disable only applies to draft-edit composer; reply-paste
+  // composer is gated only on send.isPending.
+  const editorDisabled = !editorVisible
+    || send.isPending
+    || (inDraftState && editsLeft <= 0);
+
+  // REF-30: state-dependent composer behavior
+  const replyPasteContext = inSentState || (status === STATES.REPLIED && !hasCapturedReply);
+  const composerPlaceholder = replyPasteContext
+    ? "Paste their reply here…"
+    : (editsLeft <= 0
+        ? "0 edits left — hit Looks fire 🔥 to send"
+        : "Tell me what to tweak…");
 
   // --- Action dispatcher ---
   // Handles client-only buttons (copy / open_linkedin / send_message) inline,
@@ -254,6 +286,22 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
         // No tab-switch will happen; prompt immediately.
         setConfirmOpen(true);
       }
+      return;
+    }
+
+    // REF-30: chat → PostReplyView bridge. These action kinds are emitted
+    // by the chat after a reply is captured (or by init_chat for legacy
+    // contacts). ContactPopup owns the body-swap state via onRequestLegacyView.
+    if (actionKind === "switch_to_schedule_coffee_chat") {
+      onRequestLegacyView?.("coffee_chat");
+      return;
+    }
+    if (actionKind === "switch_to_schedule_interview") {
+      onRequestLegacyView?.("interview");
+      return;
+    }
+    if (actionKind === "switch_to_record_outcome") {
+      onRequestLegacyView?.("outcome");
       return;
     }
 
@@ -333,12 +381,20 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
   const handleSendDraft = () => {
     const text = draftInput.trim();
     if (!text || editorDisabled) return;
-    send.mutate(
-      { kind: "text", content: { text }, edits_left: editsLeft },
-      {
-        onSuccess: () => setDraftInput(""),
-      },
-    );
+    // REF-30: state-dependent dispatch kind. In SENT_STATES (or REPLIED with
+    // no captured reply), the composer is the reply-paste input; elsewhere
+    // it's a draft-edit instruction.
+    if (replyPasteContext) {
+      send.mutate(
+        { kind: "reply_paste", content: { text } },
+        { onSuccess: () => setDraftInput("") },
+      );
+    } else {
+      send.mutate(
+        { kind: "text", content: { text }, edits_left: editsLeft },
+        { onSuccess: () => setDraftInput("") },
+      );
+    }
   };
 
   // --- Render ---
@@ -409,18 +465,18 @@ const RefChatPanel = ({ contact, job, onTransitionToSent }: RefChatPanelProps) =
 
       {editorVisible && (
         <div className="border-t border-border pt-3 mt-3 space-y-1.5">
-          <p className="text-[11px] text-muted-foreground px-1">
-            {editsLeft} {editsLeft === 1 ? "edit" : "edits"} left
-          </p>
+          {/* REF-30: edits-left counter only shows in draft-edit context.
+              Reply-paste / legacy-reply-prompt composer hides it. */}
+          {inDraftState && (
+            <p className="text-[11px] text-muted-foreground px-1">
+              {editsLeft} {editsLeft === 1 ? "edit" : "edits"} left
+            </p>
+          )}
           <div className="flex items-end gap-2">
             <Textarea
               value={draftInput}
               onChange={(e) => setDraftInput(e.target.value)}
-              placeholder={
-                editsLeft <= 0
-                  ? "0 edits left — hit Looks fire 🔥 to send"
-                  : "Tell me what to tweak…"
-              }
+              placeholder={composerPlaceholder}
               rows={2}
               disabled={editorDisabled}
               className="resize-none text-sm flex-1"
@@ -465,6 +521,10 @@ const ChatMessageRow = ({ message, onAction, disabled, sendArmed }: RowProps) =>
       const c = message.content as RefChatUserActionContent;
       return <UserActionChip action={c.action} />;
     }
+    if (message.kind === "reply_paste") {
+      // REF-30: render pasted reply as distinct quoted bubble
+      return <UserReplyBubble text={(message.content as RefChatReplyPasteContent).text} />;
+    }
     return null;
   }
 
@@ -476,6 +536,9 @@ const ChatMessageRow = ({ message, onAction, disabled, sendArmed }: RowProps) =>
       return <IntelCard content={message.content as RefChatIntelContent} />;
     case "draft_card":
       return <DraftCard content={message.content as RefChatDraftContent} />;
+    case "reply_classification":
+      // REF-30: low-emphasis classification chip
+      return <ReplyClassificationChip content={message.content as RefChatReplyClassificationContent} />;
     case "action_buttons":
       return (
         <ActionButtons
@@ -510,6 +573,29 @@ const UserBubble = ({ text }: { text: string }) => (
     <div className="rounded-2xl rounded-tr-sm bg-primary text-primary-foreground px-4 py-2.5 text-sm whitespace-pre-wrap">
       {text}
     </div>
+  </div>
+);
+
+// REF-30: pasted reply renders as a quoted/italic bubble distinct from
+// normal user-to-Ref text. Left-border accent + small "Their reply" label
+// signals inbound text.
+const UserReplyBubble = ({ text }: { text: string }) => (
+  <div className="flex items-start gap-2 max-w-[85%] ml-auto justify-end">
+    <div className="rounded-2xl rounded-tr-sm bg-muted/40 border-l-4 border-primary/40 px-4 py-2.5 text-sm italic text-muted-foreground whitespace-pre-wrap">
+      <p className="text-[10px] uppercase tracking-wider not-italic text-muted-foreground/70 mb-1">Their reply</p>
+      {text}
+    </div>
+  </div>
+);
+
+// REF-30: low-emphasis classification chip rendered centered between the
+// user's reply bubble and Ref's text response. Lets the user see what the
+// AI thought without dominating the chat.
+const ReplyClassificationChip = ({ content }: { content: RefChatReplyClassificationContent }) => (
+  <div className="flex justify-center my-1">
+    <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+      Classified as: <span className="font-medium">{content.label}</span> ({content.confidence} confidence)
+    </span>
   </div>
 );
 

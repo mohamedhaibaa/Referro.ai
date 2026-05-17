@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, X } from "lucide-react";
@@ -10,7 +10,7 @@ import { STATES, isPostReplyState, statusLabel } from "@/lib/contactLifecycle";
 import { Skeleton } from "@/components/ui/skeleton";
 import StateTimeline from "./StateTimeline";
 import MessageDraftView from "./MessageDraftView";
-import PostReplyView from "./PostReplyView";
+import PostReplyView, { PostReplyMode } from "./PostReplyView";
 import RefChatPanel from "./RefChatPanel";
 
 // Lifecycle states whose body renders RefChatPanel (vs PostReplyView /
@@ -25,6 +25,7 @@ const CHAT_OWNED_STATES = new Set<string>([
   STATES.FOLLOWUP_1_SENT,
   STATES.FOLLOWUP_2_DRAFTED,
   STATES.FOLLOWUP_2_SENT,
+  STATES.REPLIED,  // REF-30
 ]);
 
 interface ContactPopupProps {
@@ -37,6 +38,16 @@ interface ContactPopupProps {
 const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) => {
   const qc = useQueryClient();
   const [imgFailed, setImgFailed] = useState(false);
+  // REF-30: chat → PostReplyView bridge. When RefChatPanel's
+  // [☕ Schedule coffee chat] / [📊 Record outcome] buttons fire, this
+  // state forces the body to render PostReplyView with the matching mode
+  // pre-set. Cleared on popup close, when PostReplyView reports mode=null,
+  // or when lifecycle naturally transitions to a non-CHAT_OWNED state.
+  const [forcedPostReplyMode, setForcedPostReplyMode] = useState<PostReplyMode>(null);
+
+  useEffect(() => {
+    if (!open) setForcedPostReplyMode(null);
+  }, [open]);
 
   const { data: messages = [], isLoading: messagesLoading } = useContactOutreach(job.id, contact?.id ?? "", !!contact);
   const updateOutreach = useUpdateOutreach(job.id, contact?.id ?? "");
@@ -97,6 +108,11 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
     }
 
     if (status === STATES.REPLIED) {
+      // REF-30: chat router owns undo from REPLIED via ACTION_UNDO + UndoReplied
+      // side-effect (which clears replied_at). Popup-header undo is now
+      // defensive — should be unreachable via UI since the chat's
+      // [↩ Undo replied] button is the canonical path. Kept here in case a
+      // legacy code path triggers it: clear replied_at via the existing PATCH.
       setReplied.mutate(null);
       return;
     }
@@ -227,26 +243,38 @@ const ContactPopup = ({ job, contact, open, onOpenChange }: ContactPopupProps) =
                   <Skeleton className="h-9 w-32 rounded-full" />
                 </div>
               </div>
-            ) : CHAT_OWNED_STATES.has(status) ? (
-              // REF-13/22: chat-driven flow for not_contacted + drafted +
-              // sent + followup_*_drafted + followup_*_sent.
-              // replied / coffee_chat_* / interview_* / outcome_* continue
-              // through PostReplyView until a future ticket (REF-23) brings
-              // them into chat.
+            ) : CHAT_OWNED_STATES.has(status) && forcedPostReplyMode === null ? (
+              // REF-13/22/28/30: chat-driven flow for not_contacted +
+              // connected + drafted + sent + followup_*_drafted +
+              // followup_*_sent + replied. coffee_chat_* / interview_* /
+              // outcome_* continue through PostReplyView until a future
+              // ticket brings them into chat. REF-30: chat may bridge to
+              // PostReplyView via forcedPostReplyMode for scheduling /
+              // outcome recording from the replied-state action buttons.
               <RefChatPanel
                 job={job}
                 contact={contact}
                 onTransitionToSent={() =>
                   qc.invalidateQueries({ queryKey: ["contacts", job.id] })
                 }
+                onRequestLegacyView={(mode) => setForcedPostReplyMode(mode)}
               />
-            ) : isPostReplyState(status) ? (
+            ) : isPostReplyState(status) || forcedPostReplyMode !== null ? (
               <PostReplyView
                 job={job}
                 contact={contact}
                 messages={messages}
                 onUndo={handleUndo}
                 onClose={() => onOpenChange(false)}
+                mode={forcedPostReplyMode}
+                onModeChange={(m) => {
+                  // If PostReplyView's internal state drops to null AND lifecycle
+                  // is still chat-owned, clear the forced view so the chat panel
+                  // takes back over on next render.
+                  if (m === null && CHAT_OWNED_STATES.has(status)) {
+                    setForcedPostReplyMode(null);
+                  }
+                }}
               />
             ) : (
               <MessageDraftView

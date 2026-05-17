@@ -8,6 +8,8 @@ export type RefChatKind =
   | "intel_card"
   | "draft_card"
   | "action_buttons"
+  | "reply_paste"            // REF-30 (user-role): pasted contact reply
+  | "reply_classification"   // REF-30 (ref-role): classification chip
   | "meeting_card"
   | "pending_card"
   | "nudge_card";
@@ -30,6 +32,17 @@ export interface RefChatDraftContent {
   text: string;
   edits_left: number;
   show_counter: boolean;
+}
+
+// REF-30
+export interface RefChatReplyPasteContent {
+  text: string;
+}
+
+export interface RefChatReplyClassificationContent {
+  label: string;        // human-friendly e.g. "They want your resume"
+  intent: string;       // canonical e.g. "send_resume"
+  confidence: string;   // "low" | "med" | "high"
 }
 
 export type RefChatActionKind =
@@ -79,6 +92,8 @@ export interface RefChatMessage {
     | RefChatDraftContent
     | RefChatActionsContent
     | RefChatUserActionContent
+    | RefChatReplyPasteContent             // REF-30
+    | RefChatReplyClassificationContent    // REF-30
     | Record<string, unknown>;
   createdAt: string;
 }
@@ -86,7 +101,8 @@ export interface RefChatMessage {
 // Request body for POST /ref-chat
 export type PostRefChatBody =
   | { kind: "text"; content: RefChatTextContent; edits_left?: number }
-  | { kind: "action"; content: RefChatUserActionContent };
+  | { kind: "action"; content: RefChatUserActionContent }
+  | { kind: "reply_paste"; content: RefChatReplyPasteContent };   // REF-30
 
 // Response body for POST /ref-chat
 export interface PostRefChatResponse {
