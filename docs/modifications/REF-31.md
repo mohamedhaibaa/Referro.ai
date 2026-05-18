@@ -195,6 +195,52 @@ Manual (deferred to reviewer):
     DRAFTED-era draft_cards from the storage layer's POV. No schema
     changes; existing rows from prior tickets unaffected.
 
+## Addendum — SENT-state UX tightening
+
+Surfaced during manual testing of the main REF-31 build: SENT_STATES
+seeds still reflected the pre-REF-30 model — `[📨 They replied]` /
+`[📝 Draft follow-up]` / `[🔗 Open LinkedIn]` / `[↩ Undo send]` plus
+a composer. With `parse_reply` in place, paste-to-classify IS the
+reply path, and the extra buttons add clutter without enabling
+anything the composer (or the pinned contact header) doesn't already
+cover.
+
+**Changed:**
+
+- `_sent_state_buttons(state)` dropped `[📨 They replied]`,
+  `[🔗 Open LinkedIn]`, `[↩ Undo send]`. Now returns only the
+  draft-followup affordance per state:
+  - `sent` → `[📝 Draft follow-up]` (→ `draft_followup_1`)
+  - `fu1_sent` → `[📝 Draft follow-up]` (→ `draft_followup_2`)
+  - `fu2_sent` → empty actions list (terminal cadence; composer is
+    the only path forward — paste or close).
+- New `_sent_state_text(state, first)` helper centralizes per-state
+  Ref voice. Each variant explains both paths now available (paste
+  reply / draft bump). Used by **both** the `init_chat` SENT_STATES
+  branch AND the post-mark_sent response in `_generate_ref_response`
+  — parity-by-construction, same pattern as
+  `_replied_state_response_for_category`.
+- Copy:
+  - `sent`: "Sent! 📤 Ball's in {first}'s court. When they reply,
+    paste it below and I'll figure out the next move. Or if they go
+    quiet, you can draft a bump."
+  - `fu1_sent`: "Follow-up sent. When {first} replies, paste it below
+    and I'll read it. Or send one final bump if they're still quiet."
+  - `fu2_sent`: "Final bump sent. When {first} replies, paste it
+    below. If they don't, that's data — we pivot."
+
+**Not changed.** The dropped action kinds (`they_replied`, `undo`,
+`open_linkedin`) **remain in `VALID_USER_ACTIONS`** — they're still
+emitted from other state contexts (e.g. `undo` from REPLIED clears
+`replied_at`; `undo` from FU1_DRAFTED/FU2_DRAFTED deletes the
+follow-up row). The change is in seed emission, not the system's
+action vocabulary. Composer visibility for SENT_STATES already
+widened by REF-30 (editorVisible condition in `RefChatPanel.tsx`);
+no frontend changes needed.
+
+**Sizing.** ~+45 net code lines on top of the main REF-31 build.
+Combined ticket sizing remains M.
+
 ## Plug-in points
 
 `TODO(REF-32)` markers (none added yet — listed here for the next ticket):

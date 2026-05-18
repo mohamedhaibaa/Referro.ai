@@ -279,17 +279,53 @@ def _send_message_button() -> dict:
 
 
 def _sent_state_buttons(state: str) -> dict:
-    """Action buttons after mark_sent — depends on which *_sent state we land in.
-    fu2_sent has no draft_followup_3 (terminal follow-up cadence)."""
-    actions = [_action("📨 They replied", ACTION_THEY_REPLIED, primary=True)]
+    """Action buttons for SENT_STATES seeds.
+
+    REF-31 addendum: dropped [📨 They replied], [🔗 Open LinkedIn], and
+    [↩ Undo send] now that REF-30's paste-to-classify composer makes
+    those redundant. The composer (widened for SENT_STATES in REF-30)
+    IS the reply path; users who need LinkedIn can open from the
+    pinned contact header. Only the draft-followup affordance remains.
+
+    fu2_sent has no draft_followup_3 (terminal cadence) — returns an
+    empty actions list rather than None so callsites stay uniform.
+    """
     if state == SENT:
-        actions.append(_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_1, primary=False))
-    elif state == FU1_SENT:
-        actions.append(_action("📝 Draft another follow-up", ACTION_DRAFT_FOLLOWUP_2, primary=False))
-    # FU2_SENT: no further followup button
-    actions.append(_action("🔗 Open LinkedIn", "open_linkedin", primary=False))
-    actions.append(_action("↩ Undo send", ACTION_UNDO, primary=False))
-    return {"actions": actions}
+        return {"actions": [_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_1, primary=False)]}
+    if state == FU1_SENT:
+        return {"actions": [_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_2, primary=False)]}
+    # FU2_SENT
+    return {"actions": []}
+
+
+def _sent_state_text(state: str, first: str) -> str:
+    """REF-31 addendum: per-state Ref voice for SENT_STATES seeds.
+
+    Used by BOTH the init_chat SENT_STATES branch AND the post-mark_sent
+    response in `_generate_ref_response`. Single source of truth so the
+    copy stays in sync across entry points (same pattern REF-31 used for
+    `_replied_state_response_for_category`).
+
+    Each variant explains both paths now available from the state:
+    paste the reply (composer below) OR draft a bump (button above).
+    """
+    if state == SENT:
+        return (
+            f"Sent! 📤 Ball's in {first}'s court. When they reply, "
+            "paste it below and I'll figure out the next move. Or if "
+            "they go quiet, you can draft a bump."
+        )
+    if state == FU1_SENT:
+        return (
+            f"Follow-up sent. When {first} replies, paste it below "
+            "and I'll read it. Or send one final bump if they're "
+            "still quiet."
+        )
+    # FU2_SENT
+    return (
+        f"Final bump sent. When {first} replies, paste it below. If "
+        "they don't, that's data — we pivot."
+    )
 
 
 def _followup_stub_text(contact: Contact, fu_number: int) -> str:
@@ -458,12 +494,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {
-                        "text": (
-                            f"Sent! 📤 Ball's in {first}'s court now. I'll check "
-                            "back when they reply."
-                        ),
-                    },
+                    "content": {"text": _sent_state_text(dest_state, first)},
                 },
                 {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _sent_state_buttons(dest_state)},
             ],
@@ -1057,24 +1088,13 @@ def init_chat(
         ]
     elif state in SENT_STATES:
         # Legacy contact in a *_sent state with empty chat history.
-        if state == SENT:
-            text = (
-                f"Sent! Ball's in {first}'s court. I'll check back when "
-                "they reply."
-            )
-        elif state == FU1_SENT:
-            text = (
-                "Follow-up 1 sent. Bumps shake replies loose more often "
-                "than you'd think."
-            )
-        else:  # FU2_SENT
-            text = (
-                "Final follow-up sent. If no reply, that's data — we "
-                "pivot next."
-            )
+        # REF-31 addendum: text + buttons come from shared helpers so the
+        # copy matches the post-mark_sent response in `_generate_ref_response`
+        # byte-for-byte. Same parity-by-construction pattern REF-31 used for
+        # the REPLIED state.
         seed = [
             intel,
-            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": _sent_state_text(state, first)}},
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
                 "content": _sent_state_buttons(state),

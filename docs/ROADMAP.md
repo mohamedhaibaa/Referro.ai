@@ -470,6 +470,16 @@ Route `/jobs/:id/contacts/:contactId/coffee-chat-prep` exists
 one navigate. Filling the prep view with real content is a separate
 M-L ticket outside this roadmap.
 
+#### Updates
+
+2026-05-18 — Folded into REF-31: dropped redundant SENT-state
+buttons (`[They replied]`, `[Open LinkedIn]`, `[Undo send]`) now
+that `parse_reply` makes paste-to-classify the primary reply path.
+Composer alone (REF-30) handles capture; only `[📝 Draft follow-up]`
+remains in `sent` / `fu1_sent` (none in `fu2_sent`). Per-state Ref
+voice rewritten via new `_sent_state_text` helper shared by both
+`init_chat` seeds and the post-mark_sent response.
+
 ## Cross-cutting notes
 
 - **The "(simulate)" button context.** There is no LinkedIn API access
