@@ -27,7 +27,14 @@ from app.api.v1.outreach import CONNECTED, NOT_CONTACTED, _recompute_and_persist
 from app.db.models.job import Contact, ContactReply, Job, OutreachMessage, RefChatMessage
 from app.db.models.user import User
 from app.db.session import get_db
-from app.prompts.intent_taxonomy import INTENT_CATEGORIES, INTENT_TO_LABEL
+from app.prompts.intent_taxonomy import (
+    DRAFT_ACTION_SUFFIX_TO_INTENT,
+    INTENT_CATEGORIES,
+    INTENT_TO_DRAFT_TEMPLATE,
+    INTENT_TO_LABEL,
+    INTENT_TO_REF_TEXT,
+    fill_template,
+)
 from app.services.ref_ai import generate_initial_draft, parse_reply, revise_draft
 
 router = APIRouter()
@@ -66,6 +73,11 @@ VALID_USER_ACTIONS = {
     ACTION_DRAFT_FOLLOWUP_1,
     ACTION_DRAFT_FOLLOWUP_2,
     ACTION_UNDO,
+} | {
+    # REF-31: per-category draft_reply_<suffix> actions emitted from REPLIED.
+    # One per non-coffee_chat intent (9 total). The handler fills a template
+    # from INTENT_TO_DRAFT_TEMPLATE; no lifecycle mutation.
+    f"draft_reply_{suffix}" for suffix in DRAFT_ACTION_SUFFIX_TO_INTENT
 }
 
 # Lifecycle state literals (mirrored from outreach._derive_lifecycle_status).
@@ -267,17 +279,53 @@ def _send_message_button() -> dict:
 
 
 def _sent_state_buttons(state: str) -> dict:
-    """Action buttons after mark_sent — depends on which *_sent state we land in.
-    fu2_sent has no draft_followup_3 (terminal follow-up cadence)."""
-    actions = [_action("📨 They replied", ACTION_THEY_REPLIED, primary=True)]
+    """Action buttons for SENT_STATES seeds.
+
+    REF-31 addendum: dropped [📨 They replied], [🔗 Open LinkedIn], and
+    [↩ Undo send] now that REF-30's paste-to-classify composer makes
+    those redundant. The composer (widened for SENT_STATES in REF-30)
+    IS the reply path; users who need LinkedIn can open from the
+    pinned contact header. Only the draft-followup affordance remains.
+
+    fu2_sent has no draft_followup_3 (terminal cadence) — returns an
+    empty actions list rather than None so callsites stay uniform.
+    """
     if state == SENT:
-        actions.append(_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_1, primary=False))
-    elif state == FU1_SENT:
-        actions.append(_action("📝 Draft another follow-up", ACTION_DRAFT_FOLLOWUP_2, primary=False))
-    # FU2_SENT: no further followup button
-    actions.append(_action("🔗 Open LinkedIn", "open_linkedin", primary=False))
-    actions.append(_action("↩ Undo send", ACTION_UNDO, primary=False))
-    return {"actions": actions}
+        return {"actions": [_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_1, primary=False)]}
+    if state == FU1_SENT:
+        return {"actions": [_action("📝 Draft follow-up", ACTION_DRAFT_FOLLOWUP_2, primary=False)]}
+    # FU2_SENT
+    return {"actions": []}
+
+
+def _sent_state_text(state: str, first: str) -> str:
+    """REF-31 addendum: per-state Ref voice for SENT_STATES seeds.
+
+    Used by BOTH the init_chat SENT_STATES branch AND the post-mark_sent
+    response in `_generate_ref_response`. Single source of truth so the
+    copy stays in sync across entry points (same pattern REF-31 used for
+    `_replied_state_response_for_category`).
+
+    Each variant explains both paths now available from the state:
+    paste the reply (composer below) OR draft a bump (button above).
+    """
+    if state == SENT:
+        return (
+            f"Sent! 📤 Ball's in {first}'s court. When they reply, "
+            "paste it below and I'll figure out the next move. Or if "
+            "they go quiet, you can draft a bump."
+        )
+    if state == FU1_SENT:
+        return (
+            f"Follow-up sent. When {first} replies, paste it below "
+            "and I'll read it. Or send one final bump if they're "
+            "still quiet."
+        )
+    # FU2_SENT
+    return (
+        f"Final bump sent. When {first} replies, paste it below. If "
+        "they don't, that's data — we pivot."
+    )
 
 
 def _followup_stub_text(contact: Contact, fu_number: int) -> str:
@@ -307,6 +355,7 @@ def _generate_ref_response(
     edits_left_after: Optional[int],
     ai_result: Optional[dict] = None,
     user: Optional[User] = None,
+    extracted_data: Optional[dict] = None,
 ) -> RefResponse:
     """Pure: (state, action) -> Ref's reply messages + side effects.
     The handler executes side effects + persists. No DB calls in this function.
@@ -445,12 +494,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {
-                        "text": (
-                            f"Sent! 📤 Ball's in {first}'s court now. I'll check "
-                            "back when they reply."
-                        ),
-                    },
+                    "content": {"text": _sent_state_text(dest_state, first)},
                 },
                 {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _sent_state_buttons(dest_state)},
             ],
@@ -567,6 +611,58 @@ def _generate_ref_response(
             side_effects=[UndoReplied()],
         )
 
+    # REF-31: per-category draft emission. User clicked one of the
+    # [📨 Draft '<pattern>' message] buttons in the replied state. Emits the
+    # two-step flow (DQ-G):
+    #   1. Ref text "Here's the play..."
+    #   2. draft_card with the filled per-category template
+    #   3. action_buttons [📋 Copy] [🔗 Open LinkedIn] [📊 Record outcome] [↩ Undo replied]
+    # NO side effects. NO lifecycle transition. The draft is a conversational
+    # artifact only — chat-only drafts per DQ-C / (L-i). The user copies +
+    # sends manually via existing client-only handlers.
+    if (
+        current_state == REPLIED
+        and kind == "action"
+        and isinstance(action, str)
+        and action.startswith("draft_reply_")
+    ):
+        suffix = action[len("draft_reply_"):]
+        intent = DRAFT_ACTION_SUFFIX_TO_INTENT.get(suffix)
+        if intent is None:
+            # Defensive — validation should have caught this already.
+            return RefResponse()
+
+        template = INTENT_TO_DRAFT_TEMPLATE.get(intent, "")
+        # DQ-H: pure state machine reads extracted_data from its explicit
+        # parameter (passed in by post_chat's preload), NOT from ai_result.
+        draft_text = fill_template(template, contact, user, extracted_data)
+
+        return RefResponse(messages=[
+            {
+                "role": ROLE_REF, "kind": KIND_TEXT,
+                "content": {"text": "Here's the play — copy it, send on LinkedIn, then come back."},
+            },
+            {
+                "role": ROLE_REF, "kind": KIND_DRAFT,
+                "content": {
+                    "text": draft_text,
+                    # No edits_left / show_counter — these are chat-only drafts,
+                    # not part of the DRAFT_STATES edit-budget machinery.
+                    "edits_left": 0,
+                    "show_counter": False,
+                },
+            },
+            {
+                "role": ROLE_REF, "kind": KIND_ACTIONS,
+                "content": {"actions": [
+                    _action("📋 Copy", "copy", primary=False),
+                    _action("🔗 Open LinkedIn", "open_linkedin", primary=False),
+                    _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+                    _action("↩ Undo replied", ACTION_UNDO, primary=False),
+                ]},
+            },
+        ])
+
     if current_state in SENT_STATES and kind == "action" and action == ACTION_UNDO:
         # Clears sent_at on the current sent-state OutreachMessage.
         # _recompute_and_persist will revert lifecycle to the matching
@@ -586,6 +682,79 @@ def _generate_ref_response(
 
     # No-op fallthrough (shouldn't be reached given handler-side validation).
     return RefResponse()
+
+
+def _action_buttons_for_replied_category(intent: str) -> list[dict]:
+    """REF-31: per-category action_buttons list for replied-state UI.
+
+    Every category gets [↩ Undo replied] as trailing secondary.
+    yes_to_coffee_chat bridges to PostReplyView's scheduling picker.
+    Categories with a draft button get [📨 Draft '<pattern>' message] (primary)
+    + [📊 Record outcome]; the action_kind follows "draft_reply_<suffix>" where
+    <suffix> matches DRAFT_ACTION_SUFFIX_TO_INTENT.
+    apply_through_portal also gets a leading [🔗 Open LinkedIn] secondary
+    so the user can actually go apply.
+    """
+    record_outcome = _action("📊 Record outcome", "switch_to_record_outcome", primary=False)
+    undo_replied = _action("↩ Undo replied", ACTION_UNDO, primary=False)
+
+    if intent == "yes_to_coffee_chat":
+        return [
+            _action("☕ Schedule coffee chat", "switch_to_schedule_coffee_chat", primary=True),
+            record_outcome,
+            undo_replied,
+        ]
+
+    draft_specs: dict[str, tuple[str, str]] = {
+        "send_resume":          ("📨 Draft 'send-and-anchor' message",       "draft_reply_send_and_anchor"),
+        "im_slammed":           ("📨 Draft 'send-a-hold' follow-up",         "draft_reply_send_a_hold"),
+        "tell_me_more":         ("📨 Draft 'easier on a call' reply",        "draft_reply_easier_on_call"),
+        "send_job_link":        ("📨 Draft link-plus-meeting reply",         "draft_reply_link_plus_meeting"),
+        "apply_through_portal": ("📨 Draft 'confirmed applied' message",     "draft_reply_confirmed_applied"),
+        "not_right_person":     ("📨 Draft warm-intro ask",                  "draft_reply_warm_intro"),
+        "maybe_later":          ("📨 Draft 'specific future anchor' reply",  "draft_reply_specific_future_anchor"),
+        "soft_no":              ("📨 Draft graceful close",                  "draft_reply_graceful_close"),
+        "uncategorized":        ("📨 Draft a follow-up",                     "draft_reply_generic"),
+    }
+
+    if intent in draft_specs:
+        label, kind = draft_specs[intent]
+        actions: list[dict] = []
+        if intent == "apply_through_portal":
+            actions.append(_action("🔗 Open LinkedIn", "open_linkedin", primary=False))
+        actions.append(_action(label, kind, primary=True))
+        actions.append(record_outcome)
+        actions.append(undo_replied)
+        return actions
+
+    # Defensive fallback (shouldn't reach here given INTENT_CATEGORIES coverage above).
+    return [record_outcome, undo_replied]
+
+
+def _replied_state_response_for_category(
+    contact: Contact,
+    intent: str,
+    confidence: str,
+    extracted_data: dict | None,
+) -> tuple[str, list[dict]]:
+    """REF-31: per-category Ref text + action_buttons for replied-state UI.
+
+    Single source of truth called by BOTH:
+      - _generate_reply_capture_response (live capture, after parse_reply)
+      - init_chat case (b) (legacy reconstruction from saved ContactReply row)
+
+    Returns (text, actions) — the caller wraps these in the standard message
+    structure (classification chip + text + action_buttons row).
+
+    `intent` MUST be one of INTENT_CATEGORIES (caller is responsible for
+    coercing unknown values to "uncategorized" before invoking this).
+    `extracted_data` is reserved for future categories that need extraction
+    context in the text/button derivation; today's per-category text doesn't
+    use it (templates do, at button-click time).
+    """
+    text = INTENT_TO_REF_TEXT.get(intent, INTENT_TO_REF_TEXT["uncategorized"])
+    actions = _action_buttons_for_replied_category(intent)
+    return text, actions
 
 
 def _generate_reply_capture_response(
@@ -610,23 +779,17 @@ def _generate_reply_capture_response(
     The CaptureReply side effect inserts the ContactReply row + sets
     replied_at + recomputes lifecycle (sent / fu*_sent → replied).
     """
+    # REF-31: per-category dispatch via _replied_state_response_for_category.
+    # init_chat case (b) calls the same helper — parity guaranteed.
     intent = parsed.get("intent_category", "uncategorized")
+    if intent not in INTENT_CATEGORIES:
+        intent = "uncategorized"
     confidence = parsed.get("confidence", "low")
+    extracted_data = parsed.get("extracted_data") or {}
     label = INTENT_TO_LABEL.get(intent, INTENT_TO_LABEL["uncategorized"])
-
-    text = f"Saved their reply. Classified as: {label} ({confidence} confidence)."
-
-    if intent == "yes_to_coffee_chat":
-        actions = [
-            _action("☕ Schedule coffee chat", "switch_to_schedule_coffee_chat", primary=True),
-            _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
-            _action("↩ Undo replied", ACTION_UNDO, primary=False),
-        ]
-    else:
-        actions = [
-            _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
-            _action("↩ Undo replied", ACTION_UNDO, primary=False),
-        ]
+    text, actions = _replied_state_response_for_category(
+        contact, intent, confidence, extracted_data,
+    )
 
     return RefResponse(
         messages=[
@@ -925,24 +1088,13 @@ def init_chat(
         ]
     elif state in SENT_STATES:
         # Legacy contact in a *_sent state with empty chat history.
-        if state == SENT:
-            text = (
-                f"Sent! Ball's in {first}'s court. I'll check back when "
-                "they reply."
-            )
-        elif state == FU1_SENT:
-            text = (
-                "Follow-up 1 sent. Bumps shake replies loose more often "
-                "than you'd think."
-            )
-        else:  # FU2_SENT
-            text = (
-                "Final follow-up sent. If no reply, that's data — we "
-                "pivot next."
-            )
+        # REF-31 addendum: text + buttons come from shared helpers so the
+        # copy matches the post-mark_sent response in `_generate_ref_response`
+        # byte-for-byte. Same parity-by-construction pattern REF-31 used for
+        # the REPLIED state.
         seed = [
             intel,
-            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+            {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": _sent_state_text(state, first)}},
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
                 "content": _sent_state_buttons(state),
@@ -982,22 +1134,20 @@ def init_chat(
                 },
             ]
         else:
-            # Case (b): reconstruct from saved classification
+            # Case (b): reconstruct from saved classification.
+            # REF-31: per-category content via _replied_state_response_for_category
+            # — same source of truth as _generate_reply_capture_response (parity
+            # guaranteed). The classification chip + reply paste bubble surround
+            # the per-category text + buttons.
             intent = last_reply.classified_intent or "uncategorized"
+            if intent not in INTENT_CATEGORIES:
+                intent = "uncategorized"
             confidence = last_reply.classification_confidence or "low"
+            extracted_data = last_reply.extracted_data or {}
             label = INTENT_TO_LABEL.get(intent, INTENT_TO_LABEL["uncategorized"])
-            recon_text = f"They replied. Classified as: {label} ({confidence} confidence)."
-            if intent == "yes_to_coffee_chat":
-                recon_actions = [
-                    _action("☕ Schedule coffee chat", "switch_to_schedule_coffee_chat", primary=True),
-                    _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
-                    _action("↩ Undo replied", ACTION_UNDO, primary=False),
-                ]
-            else:
-                recon_actions = [
-                    _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
-                    _action("↩ Undo replied", ACTION_UNDO, primary=False),
-                ]
+            recon_text, recon_actions = _replied_state_response_for_category(
+                contact, intent, confidence, extracted_data,
+            )
             seed = [
                 intel,
                 {
@@ -1082,6 +1232,15 @@ def post_chat(
             # `connected` lifecycle state (PD-1 / Issue 1). REF-30 widens
             # to accept REPLIED (clears replied_at).
             raise _validation_error(action, state)
+        if (
+            isinstance(action, str)
+            and action.startswith("draft_reply_")
+            and state != REPLIED
+        ):
+            # REF-31: per-category draft buttons are only valid from REPLIED.
+            # Stale buttons clicked after lifecycle moved away (e.g. user
+            # already scheduled a coffee chat) trip this.
+            raise _validation_error(action, state)
 
     elif kind == "text":
         text_val = (content.get("text") or "").strip()
@@ -1155,6 +1314,27 @@ def post_chat(
         job = _load_job_owned(job_id, current_user, db)
         ai_result = parse_reply(contact, job, current_user, reply_text_val)
 
+    # --- REF-31: extracted_data preload for draft_reply_* actions ---
+    # DQ-H: this populates a NEW handler parameter, separate from ai_result.
+    # The handler fills its template from the latest ContactReply's stored
+    # extracted_data (set by parse_reply when the reply was originally
+    # classified). Empty dict if no reply row exists (defensive — validation
+    # above gates state==REPLIED, so a reply should normally exist).
+    extracted_data_for_handler: Optional[dict] = None
+    if (
+        kind == "action"
+        and isinstance(req_action, str)
+        and req_action.startswith("draft_reply_")
+        and state == REPLIED
+    ):
+        last_reply = (
+            db.query(ContactReply)
+            .filter(ContactReply.contact_id == contact.id)
+            .order_by(ContactReply.created_at.desc())
+            .first()
+        )
+        extracted_data_for_handler = (last_reply.extracted_data if last_reply else {}) or {}
+
     # --- Persist user message ---
     user_row = _persist_user_message(db, contact, body)
     db.flush()
@@ -1177,6 +1357,7 @@ def post_chat(
             edits_left_after=edits_left_after,
             ai_result=ai_result,
             user=current_user,
+            extracted_data=extracted_data_for_handler,
         )
 
     # --- Apply side effects ---
