@@ -388,8 +388,8 @@ Issue 6 splits into **3 tickets**:
   drafts (Plan §L decision (L-i)); no `OutreachMessage` row created.
   Sized M (+312 net lines).
 - **Ticket A″ (carve-out from A′)** (covers 6g — AI-generated
-  reply drafts): **REF-32 shipped 2026-05-18 (commit `<merge-sha>`,
-  PR #N)** — `generate_followup` AI function replaces REF-31's
+  reply drafts): **REF-32 shipped 2026-05-18 (commit `21b08e7`,
+  PR #18)** — `generate_followup` AI function replaces REF-31's
   static `INTENT_TO_DRAFT_TEMPLATE` lookup. Reads recruiter reply
   text + classification + extracted_data + user/contact/job
   context; writes contextual draft that engages with what was
@@ -585,7 +585,7 @@ distinct from `ai_result`). Shared helper
 `_replied_state_response_for_category` guarantees parity between
 live capture and `init_chat` legacy reconstruction. Sized M (+312
 net code lines). Closes Ticket A′ carve-out.
-2026-05-18 — REF-32 shipped (Issue 6g, commit `<merge-sha>`, PR #N):
+2026-05-18 — REF-32 shipped (Issue 6g, commit `21b08e7`, PR #18):
 `generate_followup` AI function replaces REF-31's static
 `INTENT_TO_DRAFT_TEMPLATE` lookup with real per-category AI
 generation grounded in recruiter reply + classification +

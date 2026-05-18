@@ -2,7 +2,7 @@
 
 **Branch:** `feat/REF-32-generate-followup-ai`
 **Status:** ready for review
-**Merged:** commit `<merge-sha>`, PR #N
+**Merged:** commit `21b08e7`, PR #18
 **Size:** **M-edge-of-L** (~+645 net code lines including the two new
 prompt modules; ~+200 net Python logic)
 
