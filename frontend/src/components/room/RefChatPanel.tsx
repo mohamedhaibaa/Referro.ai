@@ -326,7 +326,19 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
       actionKind === "they_replied" ||
       actionKind === "draft_followup_1" ||
       actionKind === "draft_followup_2" ||
-      actionKind === "undo"
+      actionKind === "undo" ||
+      // REF-31: per-category draft buttons. Server handler emits a draft_card
+      // + action_buttons; no requiresFollowup chain needed (chat-only, no
+      // lifecycle mutation — Plan §L decision (L-i)).
+      actionKind === "draft_reply_send_and_anchor" ||
+      actionKind === "draft_reply_send_a_hold" ||
+      actionKind === "draft_reply_easier_on_call" ||
+      actionKind === "draft_reply_link_plus_meeting" ||
+      actionKind === "draft_reply_confirmed_applied" ||
+      actionKind === "draft_reply_warm_intro" ||
+      actionKind === "draft_reply_specific_future_anchor" ||
+      actionKind === "draft_reply_graceful_close" ||
+      actionKind === "draft_reply_generic"
     ) {
       send.mutate(
         { kind: "action", content: { action: actionKind } },
@@ -604,6 +616,18 @@ const ACTION_LABELS: Record<string, string> = {
   she_accepted: "They accepted",
   approve_draft: "Approved",
   mark_sent: "Marked sent",
+  // REF-31: per-category draft buttons. Past tense per DQ-I — by the time
+  // the chip renders, the click has already resolved and the draft has
+  // appeared in the chat above.
+  draft_reply_send_and_anchor: "Drafted send-and-anchor",
+  draft_reply_send_a_hold: "Drafted send-a-hold",
+  draft_reply_easier_on_call: "Drafted 'easier on a call'",
+  draft_reply_link_plus_meeting: "Drafted link-plus-meeting",
+  draft_reply_confirmed_applied: "Drafted 'confirmed applied'",
+  draft_reply_warm_intro: "Drafted warm-intro ask",
+  draft_reply_specific_future_anchor: "Drafted future-anchor",
+  draft_reply_graceful_close: "Drafted graceful close",
+  draft_reply_generic: "Drafted follow-up",
 };
 
 const UserActionChip = ({ action }: { action: string }) => (

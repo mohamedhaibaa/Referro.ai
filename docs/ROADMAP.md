@@ -381,10 +381,15 @@ Issue 6 splits into **3 tickets**:
   text variants, per-category placeholder drafts, apply-and-confirm
   flow) carved out to REF-31. Sized L, not M (original estimate was
   M; honest +753 net code lines).
+- **Ticket A′ (carve-out from A)** (covers 6f — per-category
+  intelligence): **REF-31 shipped 2026-05-18 (commit `<merge-sha>`,
+  PR #N)** — per-category Ref text + per-category draft buttons +
+  per-category templates filled from `extracted_data`. Chat-only
+  drafts (Plan §L decision (L-i)); no `OutreachMessage` row created.
+  Sized M (+312 net lines).
 - **Ticket B** (covers 6c, v1 scope): Extract proposed time + prefill
-  coffee chat picker. **S complexity. Deps: Ticket A.** REF-31 will
-  also fold in the per-category specialization from REF-30's carve-out.
-  Real calendar invite work is deliberately deferred (see PD-4).
+  coffee chat picker. **S complexity. Deps: Ticket A.** Real calendar
+  invite work is deliberately deferred (see PD-4).
 - **Ticket C** (covers 6d + 6e): AI follow-up generation + coffee
   chat prep button. **M complexity. Deps: Ticket A.**
 
@@ -410,6 +415,22 @@ at `backend/app/prompts/intent_taxonomy.py` (DQ-8) is imported by
 both `ref_ai.py` and `ref_chat.py`. Temperature 0.2 for
 determinism. Try/except fallback returns uncategorized-low on AI
 failure; reply text still saved.
+
+#### 6f — Per-category intelligence — **Shipped (REF-31)**
+
+Carve-out from REF-30. `INTENT_TO_REF_TEXT` (10 entries) gives each
+classification its own Ref voice; nine intents (everything except
+`yes_to_coffee_chat`) gain a `[✏️ Draft <pattern>]` primary button
+that fills `INTENT_TO_DRAFT_TEMPLATE[intent]` via `fill_template(...)`
+using the latest `ContactReply.extracted_data`. Draft is chat-only —
+no `OutreachMessage` row, no lifecycle mutation (Plan §L decision
+(L-i): adding an OutreachMessage to a `replied` contact doesn't
+transition lifecycle because the cascade short-circuits at
+`replied_at`). Both the live reply-capture handler and the legacy
+`init_chat` reconstruction handler delegate to a shared helper for
+parity. New parameter `extracted_data` on `_generate_ref_response`
+(DQ-H: NOT a reuse of `ai_result`). Detail in
+`/docs/modifications/REF-31.md`.
 
 #### 6c — Coffee chat scheduling
 
@@ -501,3 +522,13 @@ CHAT_OWNED_STATES; PostReplyView gained controllable
 Per-category intelligence + per-category placeholder drafts +
 apply-and-confirm flow carved out to REF-31. Sized L (not M as
 originally estimated; +753 net code lines).
+2026-05-18 — REF-31 shipped (Issue 6f, commit `<merge-sha>`, PR #N):
+per-category Ref text (`INTENT_TO_REF_TEXT`, 10 entries) + nine
+per-category `[✏️ Draft …]` buttons emitting templates filled from
+`ContactReply.extracted_data`. Chat-only drafts (Plan §L decision
+(L-i)) — no `OutreachMessage` row created, no lifecycle mutation.
+New `extracted_data` parameter on `_generate_ref_response` (DQ-H:
+distinct from `ai_result`). Shared helper
+`_replied_state_response_for_category` guarantees parity between
+live capture and `init_chat` legacy reconstruction. Sized M (+312
+net code lines). Closes Ticket A′ carve-out.

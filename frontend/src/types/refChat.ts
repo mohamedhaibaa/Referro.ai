@@ -56,7 +56,19 @@ export type RefChatActionKind =
   | "undo"
   | "copy"
   | "open_linkedin"
-  | "send_message";
+  | "send_message"
+  // REF-31: per-category draft buttons emitted from REPLIED state.
+  // Server widens VALID_USER_ACTIONS to accept these; handler fills a
+  // category-specific template via fill_template().
+  | "draft_reply_send_and_anchor"
+  | "draft_reply_send_a_hold"
+  | "draft_reply_easier_on_call"
+  | "draft_reply_link_plus_meeting"
+  | "draft_reply_confirmed_applied"
+  | "draft_reply_warm_intro"
+  | "draft_reply_specific_future_anchor"
+  | "draft_reply_graceful_close"
+  | "draft_reply_generic";
 
 export interface RefChatActionDef {
   label: string;
@@ -77,7 +89,17 @@ export interface RefChatUserActionContent {
     | "they_replied"
     | "draft_followup_1"
     | "draft_followup_2"
-    | "undo";
+    | "undo"
+    // REF-31: per-category draft buttons (REPLIED state only).
+    | "draft_reply_send_and_anchor"
+    | "draft_reply_send_a_hold"
+    | "draft_reply_easier_on_call"
+    | "draft_reply_link_plus_meeting"
+    | "draft_reply_confirmed_applied"
+    | "draft_reply_warm_intro"
+    | "draft_reply_specific_future_anchor"
+    | "draft_reply_graceful_close"
+    | "draft_reply_generic";
 }
 
 // A single chat message as returned by the API. content shape depends on kind;
