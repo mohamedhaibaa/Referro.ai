@@ -12,6 +12,7 @@ Lifecycle invariant: this router does NOT directly mutate `lifecycle_status` or
   - For marking sent, we return `requires_followup="mark_sent"` and the
     frontend calls the existing `useUpdateOutreach` to PATCH `sent_at`.
 """
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -35,7 +36,15 @@ from app.prompts.intent_taxonomy import (
     INTENT_TO_REF_TEXT,
     fill_template,
 )
-from app.services.ref_ai import generate_initial_draft, parse_reply, revise_draft
+from app.prompts.user_context import UserContext, build_user_context
+from app.services.ref_ai import (
+    generate_followup,
+    generate_initial_draft,
+    parse_reply,
+    revise_draft,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -356,6 +365,7 @@ def _generate_ref_response(
     ai_result: Optional[dict] = None,
     user: Optional[User] = None,
     extracted_data: Optional[dict] = None,
+    followup_ai_result: Optional[dict] = None,
 ) -> RefResponse:
     """Pure: (state, action) -> Ref's reply messages + side effects.
     The handler executes side effects + persists. No DB calls in this function.
@@ -614,8 +624,9 @@ def _generate_ref_response(
     # REF-31: per-category draft emission. User clicked one of the
     # [📨 Draft '<pattern>' message] buttons in the replied state. Emits the
     # two-step flow (DQ-G):
-    #   1. Ref text "Here's the play..."
-    #   2. draft_card with the filled per-category template
+    #   1. Ref text "Here's the play..." (static — DD-7)
+    #   2. draft_card with the AI-generated text (REF-32) or REF-31 static
+    #      template (fallback)
     #   3. action_buttons [📋 Copy] [🔗 Open LinkedIn] [📊 Record outcome] [↩ Undo replied]
     # NO side effects. NO lifecycle transition. The draft is a conversational
     # artifact only — chat-only drafts per DQ-C / (L-i). The user copies +
@@ -632,10 +643,36 @@ def _generate_ref_response(
             # Defensive — validation should have caught this already.
             return RefResponse()
 
-        template = INTENT_TO_DRAFT_TEMPLATE.get(intent, "")
-        # DQ-H: pure state machine reads extracted_data from its explicit
-        # parameter (passed in by post_chat's preload), NOT from ai_result.
-        draft_text = fill_template(template, contact, user, extracted_data)
+        # REF-32: prefer AI-generated draft; fall back to REF-31 static
+        # template if the AI call failed (or no ContactReply existed at
+        # the preload site). Same parity-by-construction pattern as
+        # REF-31's helper sharing — one branch, two sources.
+        ai_meta: Optional[dict] = None
+        if followup_ai_result is not None:
+            draft_text = str(followup_ai_result.get("draft_text", "")).strip()
+            ai_meta = {
+                "play": followup_ai_result.get("play", ""),
+                "reasoning": followup_ai_result.get("reasoning", ""),
+                "model": "gpt-4o-mini",
+                "intent_category": intent,
+            }
+        else:
+            # REF-31 fallback (AI failed OR no ContactReply at preload).
+            template = INTENT_TO_DRAFT_TEMPLATE.get(intent, "")
+            draft_text = fill_template(template, contact, user, extracted_data)
+
+        draft_content: dict = {
+            "text": draft_text,
+            # No edits_left / show_counter — chat-only drafts, not part of
+            # the DRAFT_STATES edit-budget machinery.
+            "edits_left": 0,
+            "show_counter": False,
+        }
+        if ai_meta is not None:
+            # DD-4: JSONB sidecar for offline prompt-quality eval. Frontend
+            # ignores unknown keys; ai_meta?: Record<string, unknown> on
+            # RefChatDraftContent permits it without rendering it.
+            draft_content["ai_meta"] = ai_meta
 
         return RefResponse(messages=[
             {
@@ -644,13 +681,7 @@ def _generate_ref_response(
             },
             {
                 "role": ROLE_REF, "kind": KIND_DRAFT,
-                "content": {
-                    "text": draft_text,
-                    # No edits_left / show_counter — these are chat-only drafts,
-                    # not part of the DRAFT_STATES edit-budget machinery.
-                    "edits_left": 0,
-                    "show_counter": False,
-                },
+                "content": draft_content,
             },
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
@@ -846,6 +877,17 @@ def _initial_message_for_contact(db: Session, contact: Contact) -> Optional[Outr
         )
         .first()
     )
+
+
+def _initial_outreach_text_for_contact(db: Session, contact: Contact) -> Optional[str]:
+    """REF-32 (DD-9): return the initial outreach text or None.
+
+    None for legacy contacts that reached `replied` without an
+    OutreachMessage(type='initial') row. The FOLLOWUP_GENERATOR_SYSTEM_PROMPT
+    handles None defensively ("write fresh without referencing prior").
+    """
+    msg = _initial_message_for_contact(db, contact)
+    return msg.message if msg else None
 
 
 def _outreach_message_of_type(
@@ -1315,12 +1357,12 @@ def post_chat(
         ai_result = parse_reply(contact, job, current_user, reply_text_val)
 
     # --- REF-31: extracted_data preload for draft_reply_* actions ---
-    # DQ-H: this populates a NEW handler parameter, separate from ai_result.
-    # The handler fills its template from the latest ContactReply's stored
-    # extracted_data (set by parse_reply when the reply was originally
-    # classified). Empty dict if no reply row exists (defensive — validation
-    # above gates state==REPLIED, so a reply should normally exist).
+    # REF-32 extension: also fire generate_followup for the AI draft. Both
+    # results flow into _generate_ref_response as explicit kwargs (DQ-H
+    # precedent: no repurposing of ai_result which is reserved for the
+    # AI generations earlier in this function).
     extracted_data_for_handler: Optional[dict] = None
+    followup_ai_result: Optional[dict] = None
     if (
         kind == "action"
         and isinstance(req_action, str)
@@ -1334,6 +1376,35 @@ def post_chat(
             .first()
         )
         extracted_data_for_handler = (last_reply.extracted_data if last_reply else {}) or {}
+
+        # REF-32: AI call for the actual draft. Gated on having a
+        # ContactReply (no reply → no reply_text → can't generate). The
+        # try/except IS the fallback chain: any exception → ai_result
+        # stays None → state machine falls back to REF-31's static template.
+        # User always gets *something* in the draft_card.
+        suffix = req_action[len("draft_reply_"):]
+        intent_for_followup = DRAFT_ACTION_SUFFIX_TO_INTENT.get(suffix)
+        if last_reply is not None and intent_for_followup is not None:
+            try:
+                job_for_followup = _load_job_owned(job_id, current_user, db)
+                user_ctx = build_user_context(current_user)
+                initial_text = _initial_outreach_text_for_contact(db, contact)
+                followup_ai_result = generate_followup(
+                    contact=contact,
+                    job=job_for_followup,
+                    user_context=user_ctx,
+                    recruiter_reply_text=last_reply.reply_text,
+                    intent_category=intent_for_followup,
+                    extracted_data=extracted_data_for_handler,
+                    initial_outreach_text=initial_text,
+                )
+            except Exception:
+                logger.exception(
+                    "generate_followup failed for contact=%s intent=%s; "
+                    "falling back to REF-31 static template",
+                    contact.id, intent_for_followup,
+                )
+                # followup_ai_result stays None → state machine uses template
 
     # --- Persist user message ---
     user_row = _persist_user_message(db, contact, body)
@@ -1358,6 +1429,7 @@ def post_chat(
             ai_result=ai_result,
             user=current_user,
             extracted_data=extracted_data_for_handler,
+            followup_ai_result=followup_ai_result,
         )
 
     # --- Apply side effects ---
