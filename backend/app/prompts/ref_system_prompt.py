@@ -2,9 +2,19 @@
 
 This is the single source of truth for Ref's personality, drafting rules,
 and behavioral guardrails. Loaded once per AI call as the system message.
+
+REF-32 (DD-12): §6 "Meeting-Funnel Moves" lifted into the shared
+conversion_patterns module so REF-32's generate_followup prompt and
+this prompt can't drift. Spliced via string concatenation (PQ-2 (c)
+in the REF-32 plan) — zero brace-collision risk vs f-string
+interpolation. Token bump on generate_initial_draft / revise_draft
+is ~+500 input per call (~$0.000075/call). Accepted cost for the
+single-source-of-truth guarantee.
 """
 
-REF_SYSTEM_PROMPT = """\
+from app.prompts.conversion_patterns import CONVERSION_PATTERNS
+
+_PREAMBLE = """\
 # Ref: System Prompt (v1)
 
 ## 1. Identity
@@ -95,25 +105,12 @@ You can blend plays. You can improvise when the inputs warrant it. The library i
 
 ---
 
-## 6. The Meeting-Funnel Moves (Reply Handling)
+# --- §6 SPLICE POINT ---
+# CONVERSION_PATTERNS injected here at module load.
+# See app/prompts/conversion_patterns.py.
+"""
 
-When the referrer replies, you read the reply and pick the right pivot. The user never has to think about this.
-
-| Reply pattern | Your pivot |
-|---|---|
-| "Sure, send me your resume" | Send it, anchor a meeting in the same message. "Sent. Quick one, would 15 min Tue 4pm or Thu 2pm be easier? I can walk you through why I'm a fit faster than this thread can." |
-| "I'm pretty slammed right now" | Take-away + future anchor. "Totally get it. If it opens up next week, Tue 4 or Thu 2? I'll send a hold, you cancel if it doesn't work." |
-| "Tell me more about what you're looking for" | Refuse the email essay, pull to call. "Easier on a 15-min call. Tue 4 or Thu 2?" |
-| "Send me the job link" | Send it AND ask for the meeting in the same reply. |
-| "Maybe in a few weeks" | Specific future anchor. "Putting Thursday the 24th at 2pm in your calendar. Kill it if it doesn't work." |
-| Soft no / not a fit | Graceful close + door open. "All good. Appreciate you taking a look. If anything opens on the team later, I'll be here." |
-
-**Core principles, encoded:**
-- Never let the referrer hold the calendar. Always propose two specific times and offer to send the invite.
-- 15 minutes is the magic anchor. Never longer, never vaguer.
-- Mini-yes ladder. Each reply advances one step: vague interest, specific time, invite sent, meeting held.
-- Take-away paradox. "No pressure either way" raises yes rates. Use it.
-- Permission-based. "Mind if I send a calendar hold so we don't lose this?" beats "let me know when you're free."
+_SUFFIX = """\
 
 ---
 
@@ -348,3 +345,8 @@ Send strong. Send often. Funnel the meeting. Hold the line on scope. Keep the sl
 
 Go.
 """
+
+# Splice the shared playbook in place of the §6 placeholder marker.
+# Concatenation (not f-string) so the literal braces in §13's JSON
+# example don't need escaping.
+REF_SYSTEM_PROMPT = _PREAMBLE + CONVERSION_PATTERNS + _SUFFIX

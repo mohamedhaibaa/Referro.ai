@@ -32,6 +32,7 @@ export interface RefChatDraftContent {
   text: string;
   edits_left: number;
   show_counter: boolean;
+  ai_meta?: Record<string, unknown>;  // REF-32: AI-gen metadata sidecar; not rendered.
 }
 
 // REF-30

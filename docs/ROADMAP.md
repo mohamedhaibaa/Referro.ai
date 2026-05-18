@@ -387,11 +387,25 @@ Issue 6 splits into **3 tickets**:
   per-category templates filled from `extracted_data`. Chat-only
   drafts (Plan §L decision (L-i)); no `OutreachMessage` row created.
   Sized M (+312 net lines).
+- **Ticket A″ (carve-out from A′)** (covers 6g — AI-generated
+  reply drafts): **REF-32 shipped 2026-05-18 (commit `<merge-sha>`,
+  PR #N)** — `generate_followup` AI function replaces REF-31's
+  static `INTENT_TO_DRAFT_TEMPLATE` lookup. Reads recruiter reply
+  text + classification + extracted_data + user/contact/job
+  context; writes contextual draft that engages with what was
+  said. REF-31 static template preserved as fallback. Foundation-
+  ready: new `UserContext` dataclass accepts REF-33 resume
+  enrichment without architecture change. Sized M-edge-of-L
+  (+645 net lines including 2 new prompt modules). Three prompt-
+  iteration cycles required to clear the strict Janini gate on
+  gpt-4o-mini.
 - **Ticket B** (covers 6c, v1 scope): Extract proposed time + prefill
   coffee chat picker. **S complexity. Deps: Ticket A.** Real calendar
   invite work is deliberately deferred (see PD-4).
-- **Ticket C** (covers 6d + 6e): AI follow-up generation + coffee
-  chat prep button. **M complexity. Deps: Ticket A.**
+- **Ticket C** (covers 6d + 6e): AI follow-up generation (bumps
+  for fu1/fu2) + coffee chat prep button. **M complexity. Deps:
+  Ticket A.** REF-32 architecture transfers cleanly — see
+  `/docs/modifications/REF-32.md` plug-in points.
 
 Per-sub-issue status:
 
@@ -415,6 +429,27 @@ at `backend/app/prompts/intent_taxonomy.py` (DQ-8) is imported by
 both `ref_ai.py` and `ref_chat.py`. Temperature 0.2 for
 determinism. Try/except fallback returns uncategorized-low on AI
 failure; reply text still saved.
+
+#### 6g — AI-generated reply drafts — **Shipped (REF-32)**
+
+Carve-out from REF-31. `generate_followup` in `ref_ai.py`
+replaces REF-31's `INTENT_TO_DRAFT_TEMPLATE` lookup; reads
+recruiter reply text + classification + extracted_data + user/
+contact/job context and writes a draft that engages with what
+was actually said. REF-31's static template is the fallback when
+the AI call fails or no `ContactReply` exists at preload —
+user always gets *something*. New `UserContext` dataclass in
+`backend/app/prompts/user_context.py` (promoted from REF-13's
+stub) is foundation-ready for REF-33 (resume parsing): v1
+populates name/email; v2 fields default empty until REF-33 wires
+them up. New `CONVERSION_PATTERNS` module shared by
+`REF_SYSTEM_PROMPT` and `FOLLOWUP_GENERATOR_SYSTEM_PROMPT` —
+DD-12 single source of truth for the per-category playbook.
+`ai_meta` sidecar in `ref_chat_messages.content` logs play +
+reasoning + model for offline prompt-quality evaluation (DD-4).
+Three prompt-iteration cycles required to clear the strict
+Janini gate on gpt-4o-mini — see mod record's "Build iteration
+history" section. Detail in `/docs/modifications/REF-32.md`.
 
 #### 6f — Per-category intelligence — **Shipped (REF-31)**
 
@@ -480,6 +515,14 @@ remains in `sent` / `fu1_sent` (none in `fu2_sent`). Per-state Ref
 voice rewritten via new `_sent_state_text` helper shared by both
 `init_chat` seeds and the post-mark_sent response.
 
+2026-05-18 — REF-32 shipped (Issue 6g, AI-generated reply drafts).
+Real AI behind REF-31's per-category draft buttons. Required 3
+prompt-iteration cycles to clear strict Janini gate on gpt-4o-mini
+(JD-leak in cycle 1; soft general claims + banned-phrase
+word-injection in cycle 2; HARD-RULE openers + pattern bans in
+cycle 3). Foundation-ready UserContext dataclass for REF-33.
+Shared CONVERSION_PATTERNS module via string-concat splice.
+
 ## Cross-cutting notes
 
 - **The "(simulate)" button context.** There is no LinkedIn API access
@@ -542,3 +585,20 @@ distinct from `ai_result`). Shared helper
 `_replied_state_response_for_category` guarantees parity between
 live capture and `init_chat` legacy reconstruction. Sized M (+312
 net code lines). Closes Ticket A′ carve-out.
+2026-05-18 — REF-32 shipped (Issue 6g, commit `<merge-sha>`, PR #N):
+`generate_followup` AI function replaces REF-31's static
+`INTENT_TO_DRAFT_TEMPLATE` lookup with real per-category AI
+generation grounded in recruiter reply + classification +
+extracted_data + user/contact/job context. REF-31 static template
+preserved as fallback (DD-6 silent fallback chain). New
+`UserContext` dataclass (foundation-ready for REF-33 resume
+parsing — v1 thin, v2 fields default empty). New shared
+`CONVERSION_PATTERNS` module spliced into both
+`REF_SYSTEM_PROMPT` (via string concat — PQ-2 (c)) and
+`FOLLOWUP_GENERATOR_SYSTEM_PROMPT` (via f-string). `ai_meta`
+JSONB sidecar in `ref_chat_messages.content` (DD-4 — frontend
+type accepts as `Record<string, unknown>`, never rendered).
+Sized M-edge-of-L (+645 net code lines). Three prompt-iteration
+cycles required to clear strict Janini gate on gpt-4o-mini —
+honest cycle history preserved in mod record. Zero schema
+changes. Closes Ticket A″ carve-out.

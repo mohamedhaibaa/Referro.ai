@@ -245,6 +245,144 @@ def parse_reply(
         }
 
 
+def _build_contact_summary_for_followup(contact: Contact, job: "object") -> str:
+    """REF-32: contact + job summary for follow-up generation.
+
+    Heavier than _build_contact_summary_for_classification (gives
+    the AI bio + past positions so it can write contextual drafts);
+    lighter than build_ref_context (no chat history — that comes in
+    via the explicit initial_outreach_text parameter, per DD-3).
+    """
+    from app.prompts.ref_context import _extract_profile_highlights
+
+    first = (contact.full_name or "there").split(" ")[0]
+    highlights = (
+        _extract_profile_highlights(contact.profile_data)
+        if contact.profile_data
+        else {}
+    )
+
+    lines = [
+        "## Recruiter / contact",
+        f"- Name: {contact.full_name or 'Unknown'} (first: {first})",
+        f"- Title: {contact.title or 'Unknown'}",
+        f"- Company: {contact.company or 'Unknown'}",
+    ]
+    if contact.location:
+        lines.append(f"- Location: {contact.location}")
+    if contact.university:
+        lines.append(f"- University: {contact.university}")
+    if highlights.get("bio"):
+        lines.append(f"- Bio: {highlights['bio']}")
+    if highlights.get("education"):
+        # Take the first/most-recent only — concise context, not a full transcript.
+        edu = highlights["education"][0]
+        edu_str = edu.get("school") or "Unknown"
+        if edu.get("degree"):
+            edu_str = f"{edu['degree']}, {edu_str}"
+        lines.append(f"- Top education: {edu_str}")
+    if highlights.get("positions"):
+        lines.append("- Past/current positions:")
+        for pos in highlights["positions"][:3]:
+            title = pos.get("title") or "Unknown role"
+            company = pos.get("company") or "Unknown company"
+            lines.append(f"  - {title} at {company}")
+
+    lines.append("")
+    lines.append("## Job posting")
+    lines.append(f"- Title: {getattr(job, 'title', 'Unknown')}")
+    lines.append(f"- Company: {getattr(job, 'company', 'Unknown')}")
+    if getattr(job, "role_family", None):
+        lines.append(f"- Role family: {job.role_family}")
+    if getattr(job, "work_mode", None):
+        lines.append(f"- Work mode: {job.work_mode}")
+    # REF-32 iteration: deliberately OMITTING job.description here.
+    # The JD's required-skills list (e.g. "Strong Python, Java, REST APIs")
+    # leaks into the AI's view of the USER when the recruiter asks about
+    # background — the AI conflates "role requires" with "user has" and
+    # fabricates skill claims. Keep the role categorical only; the
+    # recruiter's reply text is the source of truth for what they asked.
+
+    return "\n".join(lines)
+
+
+def generate_followup(
+    contact: Contact,
+    job: "object",
+    user_context: "object",  # UserContext (avoid circular import at top)
+    recruiter_reply_text: str,
+    intent_category: str,
+    extracted_data: dict,
+    initial_outreach_text: Optional[str] = None,
+) -> dict:
+    """REF-32: write a contextual coffee-chat conversion follow-up.
+
+    Returns:
+        {
+          "draft_text": str,   # message text user will copy + send
+          "play": str,         # pattern name for ai_meta logging
+          "reasoning": str,    # rationale for offline eval
+        }
+
+    Raises on ANY failure (AI down, JSON parse error, missing keys,
+    empty draft_text). Caller is responsible for the REF-31 static
+    template fallback — keeps the failure path explicit and out of
+    the pure state machine.
+
+    Per DD-5: temperature 0.7 (drafting is creative work).
+    Per DD-9: initial_outreach_text may be None for legacy contacts;
+    the prompt handles None defensively.
+
+    Token / cost (gpt-4o-mini): ~$0.0005/call.
+    """
+    from app.prompts.followup_generator import FOLLOWUP_GENERATOR_SYSTEM_PROMPT
+    from app.prompts.user_context import render_user_context_block
+
+    contact_summary = _build_contact_summary_for_followup(contact, job)
+    user_block = render_user_context_block(user_context)
+    extracted_json = json.dumps(extracted_data) if extracted_data else "{}"
+
+    parts = [
+        contact_summary,
+        "",
+        "## User context",
+        user_block,
+        "",
+        f"## Recruiter's reply\n<reply>\n{recruiter_reply_text}\n</reply>",
+        "",
+        "## Classification",
+        f"- intent_category: {intent_category}",
+        f"- extracted_data: {extracted_json}",
+    ]
+    if initial_outreach_text:
+        parts.extend([
+            "",
+            "## User's initial outreach (what they sent first)",
+            f"<initial>\n{initial_outreach_text}\n</initial>",
+        ])
+    else:
+        parts.extend([
+            "",
+            "## User's initial outreach",
+            "(not available — write fresh without referencing prior outreach)",
+        ])
+    parts.extend(["", "Now write the draft. Return JSON."])
+    user_message = "\n".join(parts)
+
+    raw = _call_ai_foundry_with_temp(
+        FOLLOWUP_GENERATOR_SYSTEM_PROMPT,
+        user_message,
+        temperature=0.7,
+    )
+    parsed = _parse_ref_response(raw)
+    for key in ("draft_text", "play", "reasoning"):
+        if key not in parsed:
+            raise ValueError(f"Missing required key in generate_followup response: {key}")
+    if not str(parsed["draft_text"]).strip():
+        raise ValueError("generate_followup returned empty draft_text")
+    return parsed
+
+
 def _fallback_draft(contact: Contact) -> dict:
     """Template fallback when AI is unavailable."""
     first = (contact.full_name or "there").split(" ")[0]
