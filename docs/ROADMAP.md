@@ -376,10 +376,11 @@ sub-tickets now unblocked.
 Issue 6 splits into **3 tickets**:
 
 - **Ticket A** (covers 6a + 6b): Reply capture + AI reply parsing.
-  **REF-30 shipped 2026-05-17** — capture + classify + generic chat
-  response. Per-category intelligence (Ref text variants, per-category
-  placeholder drafts, apply-and-confirm flow) carved out to REF-31.
-  Sized L, not M (original estimate was M; honest +753 net code lines).
+  **REF-30 shipped 2026-05-17 (commit `4846277`, PR #16)** — capture
+  + classify + generic chat response. Per-category intelligence (Ref
+  text variants, per-category placeholder drafts, apply-and-confirm
+  flow) carved out to REF-31. Sized L, not M (original estimate was
+  M; honest +753 net code lines).
 - **Ticket B** (covers 6c, v1 scope): Extract proposed time + prefill
   coffee chat picker. **S complexity. Deps: Ticket A.** REF-31 will
   also fold in the per-category specialization from REF-30's carve-out.
@@ -491,11 +492,12 @@ greets the user by first name; simulate button relabeled.
 2026-05-13 — REF-28 shipped (Issue 1): new `connected` lifecycle
 state + connection-request deep link. Schema migration applied to
 Azure prod. REF-25 supersession noted in its mod record.
-2026-05-17 — REF-30 shipped (Issue 6a + 6b): chat-native reply
-capture in SENT_STATES + parse_reply AI classification into 10 intent
-categories. New `contact_replies` table (migration `n4o5p6q7r8s9`
-applied to Azure prod). `replied` joined CHAT_OWNED_STATES;
-PostReplyView gained controllable `mode`/`onModeChange` props for the
-chat → scheduling bridge. Per-category intelligence + per-category
-placeholder drafts + apply-and-confirm flow carved out to REF-31.
-Sized L (not M as originally estimated; +753 net code lines).
+2026-05-17 — REF-30 shipped (Issue 6a + 6b, commit `4846277`, PR #16):
+chat-native reply capture in SENT_STATES + parse_reply AI
+classification into 10 intent categories. New `contact_replies` table
+(migration `n4o5p6q7r8s9` applied to Azure prod). `replied` joined
+CHAT_OWNED_STATES; PostReplyView gained controllable
+`mode`/`onModeChange` props for the chat → scheduling bridge.
+Per-category intelligence + per-category placeholder drafts +
+apply-and-confirm flow carved out to REF-31. Sized L (not M as
+originally estimated; +753 net code lines).

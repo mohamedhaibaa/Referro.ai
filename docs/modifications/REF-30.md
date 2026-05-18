@@ -2,6 +2,7 @@
 
 **Branch:** `feat/REF-30-reply-capture-and-classification`
 **Status:** shipped
+**Merged:** commit `4846277`, PR #16
 **Size:** **L** (the plan estimated +627 net code lines; honest L sizing.
 M-ceiling per ROADMAP was overshot. No scope cut.)
 
