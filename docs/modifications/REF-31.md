@@ -241,6 +241,36 @@ no frontend changes needed.
 **Sizing.** ~+45 net code lines on top of the main REF-31 build.
 Combined ticket sizing remains M.
 
+## Known limitations
+
+REF-31's per-category drafts are static templates. They work for the
+common case (short, clearly-deflective replies) but fail when the
+recruiter sends a thoughtful, multi-part reply that requires actual
+engagement.
+
+Real example surfaced during manual testing: a `tell_me_more` reply
+offering four specific lanes of help and asking which the user
+wanted. REF-31's static template ("Easier on a 15-min call than over
+text. Tue 4 or Thu 2?") ignores the recruiter's offers entirely. The
+static template cannot read what the recruiter sent.
+
+This limitation also affects the per-category Ref text. `tell_me_more`'s
+framing ("They're gate-keeping with an essay request") is true for
+SOME tell_me_more replies but not all. The recruiter who offers four
+lanes is not gate-keeping; she's engaged.
+
+## Path forward
+
+REF-32 (`generate_followup` AI function) is the structural fix.
+`parse_reply` classifies + extracts; `generate_followup` reads the
+reply text and writes a continuation that engages with what was said.
+REF-31's `INTENT_TO_DRAFT_TEMPLATE` and
+`_replied_state_response_for_category` are the seams REF-32 swaps the
+static content out of.
+
+REF-31 ships as the structural foundation. REF-32 makes the drafts
+good.
+
 ## Plug-in points
 
 `TODO(REF-32)` markers (none added yet — listed here for the next ticket):
