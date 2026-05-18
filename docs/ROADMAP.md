@@ -382,8 +382,8 @@ Issue 6 splits into **3 tickets**:
   flow) carved out to REF-31. Sized L, not M (original estimate was
   M; honest +753 net code lines).
 - **Ticket A′ (carve-out from A)** (covers 6f — per-category
-  intelligence): **REF-31 shipped 2026-05-18 (commit `<merge-sha>`,
-  PR #N)** — per-category Ref text + per-category draft buttons +
+  intelligence): **REF-31 shipped 2026-05-18 (commit `c41c412`,
+  PR #17)** — per-category Ref text + per-category draft buttons +
   per-category templates filled from `extracted_data`. Chat-only
   drafts (Plan §L decision (L-i)); no `OutreachMessage` row created.
   Sized M (+312 net lines).
@@ -532,7 +532,7 @@ CHAT_OWNED_STATES; PostReplyView gained controllable
 Per-category intelligence + per-category placeholder drafts +
 apply-and-confirm flow carved out to REF-31. Sized L (not M as
 originally estimated; +753 net code lines).
-2026-05-18 — REF-31 shipped (Issue 6f, commit `<merge-sha>`, PR #N):
+2026-05-18 — REF-31 shipped (Issue 6f, commit `c41c412`, PR #17):
 per-category Ref text (`INTENT_TO_REF_TEXT`, 10 entries) + nine
 per-category `[✏️ Draft …]` buttons emitting templates filled from
 `ContactReply.extracted_data`. Chat-only drafts (Plan §L decision

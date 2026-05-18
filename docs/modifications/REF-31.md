@@ -2,7 +2,7 @@
 
 **Branch:** `feat/REF-31-per-category-intelligence`
 **Status:** ready for review
-**Merged:** commit `<merge-sha>`, PR #N
+**Merged:** commit `c41c412`, PR #17
 **Size:** **M** (~+312 net code lines). Within M ceiling.
 
 ## Scope
