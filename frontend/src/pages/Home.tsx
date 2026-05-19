@@ -1,6 +1,7 @@
 import { useState, FormEvent } from "react";
 import { ArrowRight, Link as LinkIcon, Zap } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import ResumeNudgeBanner from "@/components/ResumeNudgeBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
 import { useCreateJob, useJobs } from "@/hooks/useJobs";
@@ -71,8 +72,13 @@ const Home = () => {
     <div className="min-h-screen bg-background">
       <Sidebar />
 
-      <main className="ml-20 min-h-screen flex items-center justify-center p-8">
-        <div className="w-full max-w-2xl flex flex-col items-center gap-6">
+      <main className="ml-20 min-h-screen flex flex-col p-8">
+        {/* REF-33b: nudge banner — renders only when profile.isThin is true,
+            dismissible per session. Sits above the centered hero content. */}
+        <div className="w-full max-w-2xl mx-auto pt-2">
+          <ResumeNudgeBanner />
+        </div>
+        <div className="flex-1 w-full max-w-2xl mx-auto flex flex-col items-center justify-center gap-6">
           <h1 className="text-4xl font-serif font-bold text-foreground text-center">
             {greeting}
           </h1>

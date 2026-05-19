@@ -22,7 +22,8 @@ const Signup = () => {
     try {
       const payload = await register(email, password, name);
       setUser(payload.user);
-      navigate("/");
+      // REF-33b: route to resume onboarding step. Skip → "/" (DQ-I).
+      navigate("/onboarding/resume");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
