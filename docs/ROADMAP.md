@@ -535,7 +535,7 @@ ground claims in real user background instead of falling back to
 Splits into 2 tickets:
 
 - **Ticket 7a (backend)**: **REF-33a shipped 2026-05-18 (commit
-  `<merge-sha>`, PR #N)** — new `user_profiles` table (1:1, CASCADE),
+  `6ffa32f`, PR #19)** — new `user_profiles` table (1:1, CASCADE),
   real `BlobStorageClient` (worker stub replaced + moved to backend),
   `parse_resume` AI function + `RESUME_PARSER_SYSTEM_PROMPT`,
   `POST/GET/PATCH/DELETE /api/v1/profile/resume`, `build_user_context(user, db)`
@@ -654,7 +654,7 @@ cycles required to clear strict Janini gate on gpt-4o-mini —
 honest cycle history preserved in mod record. Zero schema
 changes. Closes Ticket A″ carve-out.
 2026-05-18 — REF-33a shipped (Issue 7a backend, commit
-`<merge-sha>`, PR #N): new `user_profiles` table (migration
+`6ffa32f`, PR #19): new `user_profiles` table (migration
 `o5p6q7r8s9t0` applied to Azure prod, push-first per CLAUDE.md
 §5), real `BlobStorageClient` via `BlobServiceClient.from_connection_string`
 (replaces the NotImplementedError stub; moved from worker to

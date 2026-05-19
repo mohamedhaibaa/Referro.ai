@@ -2,7 +2,7 @@
 
 **Branch:** `feat/REF-33a-resume-parsing-backend`
 **Status:** ready for review
-**Merged:** commit `<merge-sha>`, PR #N
+**Merged:** commit `6ffa32f`, PR #19
 **Size:** **M-L** (~+710 net code lines including 1 prompt + 1 mod doc;
 ~+540 Python logic + new prompt; one new table)
 
