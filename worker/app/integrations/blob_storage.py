@@ -1,22 +1,8 @@
-from azure.storage.blob import BlobServiceClient
-from app.core.config import settings
+"""REF-33a: re-export shim.
 
-
-class BlobStorageClient:
-    """Client for Azure Blob Storage."""
-
-    def __init__(self):
-        self.account = settings.BLOB_STORAGE_ACCOUNT
-
-    def upload(self, container: str, blob_path: str, data: bytes, content_type: str = "application/octet-stream") -> str:
-        """
-        Upload data to blob storage.
-
-        Returns:
-            Full blob URL
-        """
-        # TODO: implement upload using azure-storage-blob SDK
-        raise NotImplementedError("Blob upload not yet implemented")
-
-
-blob_storage = BlobStorageClient()
+Real implementation moved to backend/app/services/blob_storage.py.
+Kept here so any defensive imports from worker code don't break.
+Grep at REF-33a time showed no callers in worker — this shim is
+purely backward-compat insurance.
+"""
+from app.services.blob_storage import BlobStorageClient, blob_storage  # noqa: F401

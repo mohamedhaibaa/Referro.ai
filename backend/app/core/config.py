@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: str = "http://localhost:5173"
 
     BLOB_STORAGE_ACCOUNT: str = ""
+    BLOB_STORAGE_CONNECTION_STRING: str = ""  # REF-33a: full Azure Blob connection string
     BLOB_STORAGE_CONTAINER_RESUMES: str = "resumes"
     BLOB_STORAGE_CONTAINER_EXPORTS: str = "exports"
     BLOB_STORAGE_CONTAINER_AI_OUTPUTS: str = "ai-outputs"

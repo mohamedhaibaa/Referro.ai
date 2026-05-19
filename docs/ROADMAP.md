@@ -523,6 +523,57 @@ word-injection in cycle 2; HARD-RULE openers + pattern bans in
 cycle 3). Foundation-ready UserContext dataclass for REF-33.
 Shared CONVERSION_PATTERNS module via string-concat splice.
 
+---
+
+### Issue 7 — Resume integration (sub-issues 7a backend, 7b frontend)
+
+REF-32's UserContext is foundation-ready but v2 fields default empty
+until a resume is uploaded. Issue 7 populates them so AI drafts can
+ground claims in real user background instead of falling back to
+"happy to walk through specifics on a call".
+
+Splits into 2 tickets:
+
+- **Ticket 7a (backend)**: **REF-33a shipped 2026-05-18 (commit
+  `<merge-sha>`, PR #N)** — new `user_profiles` table (1:1, CASCADE),
+  real `BlobStorageClient` (worker stub replaced + moved to backend),
+  `parse_resume` AI function + `RESUME_PARSER_SYSTEM_PROMPT`,
+  `POST/GET/PATCH/DELETE /api/v1/profile/resume`, `build_user_context(user, db)`
+  JOINs the new table, ALL THREE existing AI functions
+  (`generate_initial_draft`, `revise_draft`, `generate_followup`) now
+  receive rich context the moment a user uploads. Sized M-L (+710 net
+  code lines).
+- **Ticket 7b (frontend)**: signup wizard step at `/onboarding/resume`,
+  `/settings` page with `Resume & Background` section, parsed-fields
+  editor (per-field structured input — DQ-D), dismissible
+  ResumeNudgeBanner on dashboard for thin-context users (DQ-E),
+  UserMenu dropdown linking to Settings (DQ-H). **Depends on REF-33a
+  deploy.** Sized L (~+890 frontend lines).
+
+#### 7a — Backend (resume upload + parsing) — **Shipped (REF-33a)**
+
+Adds `user_profiles` table holding parsed resume data + raw blob
+path. UPSERT preserves manually-edited fields across re-upload (the
+`overwrote_user_edits` meta flag surfaces which fields were kept).
+Hard delete clears blob + row. AI parsing degrades gracefully —
+upload always succeeds; empty parse returns 201 with
+`parse_failed=true` for the frontend to surface. Detail in
+`/docs/modifications/REF-33a.md`.
+
+#### 7b — Frontend (signup wizard + settings page + nudge banner)
+
+Blocked on 7a deploy. See REF-33 recon for design questions already
+locked (DQ-A through DQ-L).
+
+#### Updates
+
+2026-05-18 — REF-33a shipped (Issue 7a backend). UserContext v2
+fields now populate from `user_profiles` whenever a resume has been
+uploaded. REF-32's `generate_followup` and REF-17's
+`generate_initial_draft` / `revise_draft` all benefit immediately
+on first upload — no further code change required for rich context
+to land in AI prompts.
+
 ## Cross-cutting notes
 
 - **The "(simulate)" button context.** There is no LinkedIn API access
@@ -602,3 +653,17 @@ Sized M-edge-of-L (+645 net code lines). Three prompt-iteration
 cycles required to clear strict Janini gate on gpt-4o-mini —
 honest cycle history preserved in mod record. Zero schema
 changes. Closes Ticket A″ carve-out.
+2026-05-18 — REF-33a shipped (Issue 7a backend, commit
+`<merge-sha>`, PR #N): new `user_profiles` table (migration
+`o5p6q7r8s9t0` applied to Azure prod, push-first per CLAUDE.md
+§5), real `BlobStorageClient` via `BlobServiceClient.from_connection_string`
+(replaces the NotImplementedError stub; moved from worker to
+backend with re-export shim), `parse_resume` AI function + new
+`RESUME_PARSER_SYSTEM_PROMPT` (temp 0.2, defensive empty-dict
+fallback mirroring REF-30 `parse_reply`),
+`POST/GET/PATCH/DELETE /api/v1/profile/resume` endpoints with
+manual-edit preservation across re-upload (DQ-K). All three
+existing AI functions (`generate_initial_draft`, `revise_draft`,
+`generate_followup`) threaded with `db` so rich UserContext flows
+through immediately on resume upload. Sized M-L (+710 net code
+lines). REF-33b frontend follows.
