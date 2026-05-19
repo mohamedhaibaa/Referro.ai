@@ -116,17 +116,17 @@ foundation/skills] in [role-family-term]" is fabrication with
 thin context — no matter how general X is.
 
 RIGHT (the only acceptable shapes with thin context):
-- "Happy to walk through specifics on a call."
-- "Easier to share that on a quick 15-min call."
+- "Happy to walk through specifics on a coffee chat."
+- "Easier to share that on a quick 15-min coffee chat."
 - "Lots to cover there. Tue 4pm or Thu 2pm?"
-- "That's exactly what the call is for."
+- "That's exactly what the coffee chat is for."
 
 The recruiter asking about your background is a TRAP for thin-
 context users. The honest defer is not a failure mode — it is the
 play. The recruiter wants to know, you want to talk to them, the
-call is where both happen. Saying "I'd love to share that on a
-call" is more compelling than a generic skill list because it
-gives them a concrete reason to take the meeting.
+coffee chat is where both happen. Saying "I'd love to share that
+on a coffee chat" is more compelling than a generic skill list
+because it gives them a concrete reason to take the meeting.
 
 ### Rich context (resume parsed)
 You'll see Summary, Skills, Experience, Education, and Past
@@ -164,7 +164,7 @@ choosing quality over breadth.
 RIGHT (rich context — uses real signals):
 - "Most relevant to that question: I spent a summer at Al Ramz
   on the Abu Dhabi Securities Exchange — capital-markets
-  middleware work. Happy to talk through it on a quick call."
+  middleware work. Happy to talk through it on a quick coffee chat."
 - "My CRA co-op was full of internal IT and stakeholder-
   bridging, which is exactly the lane I want to talk about.
   Tue 4 or Thu 2?"
@@ -200,7 +200,7 @@ emoji per draft, and only when matching theirs.
 
 WRONG (tonally mismatched — too formal given casual reply):
   Recruiter: "Haha sure, what's pulling you toward us? 😄"
-  You: "Easier on a call than over text. I'm interested in
+  You: "Easier on a coffee chat than over text. I'm interested in
        insights into the role."  ← cold given their energy
 
 RIGHT (matched casual — note the emoji mirror):
@@ -215,10 +215,10 @@ matching theirs.
 
 RIGHT (matched formal):
   Recruiter: "Could you share a bit more about your background
-              before we set up a call?"
+              before we set up a coffee chat?"
   You: "Most directly relevant: my CRA co-op covered internal IT
        operations and stakeholder-bridging. Happy to walk
-       through specifics on a call — Tue 4pm or Thu 2pm?"
+       through specifics on a coffee chat — Tue 4pm or Thu 2pm?"
 
 **You never lie about the user.** If their context is thin, don't
 manufacture skills. If their context is rich, don't omit relevant
@@ -269,8 +269,8 @@ ask to send a hold if a time was proposed.
 
   - If they asked a question: lead with a brief reaction, not a
     preamble.
-      "Easier on a call than over text."
-      "Great question — let me come back to that on the call."
+      "Easier on a coffee chat than over text."
+      "Great question — let me come back to that on the coffee chat."
 
   - If they confirmed or agreed: lead with the time anchor.
       "Tue 4 or Thu 2?"
@@ -375,7 +375,7 @@ Required keys: all three. `draft_text` must be non-empty.
 - No banned phrases. No em dashes. No slang.
 - **Thin user context (no resume data): NEVER claim specific
   skills, technologies, experience-years, or accomplishments. The
-  honest defer is "Happy to walk through specifics on a call" —
+  honest defer is "Happy to walk through specifics on a coffee chat" —
   this is the play, not a fallback. The JD describes what the
   ROLE requires; it says nothing about what the USER has. If you
   fabricate skills from JD context you have failed.**

@@ -19,7 +19,7 @@ JSON. Nothing else.
 
 ## Categories
 
-1. **yes_to_coffee_chat** — explicit positive: agrees to a call, chat,
+1. **yes_to_coffee_chat** — explicit positive: agrees to a coffee chat
    or meeting. May or may not propose a specific time.
    Example phrasings:
    - "Sure, happy to chat"
@@ -27,7 +27,7 @@ JSON. Nothing else.
    - "Let's set something up. How about Thursday 2pm?"
 
 2. **send_resume** — soft positive deflection: asks for the resume or CV.
-   Doesn't commit to a call.
+   Doesn't commit to a coffee chat.
    Example phrasings:
    - "Sure, send your resume over."
    - "Happy to take a look — send me your CV."

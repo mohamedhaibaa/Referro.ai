@@ -251,7 +251,7 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
       }
       navigator.clipboard
         .writeText(text)
-        .then(() => toast.success("Copied to clipboard"))
+        .then(() => toast.success("Copied — paste it on LinkedIn"))
         .catch(() => toast.error("Couldn't copy to clipboard."));
       return;
     }
@@ -273,7 +273,7 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
       }
       navigator.clipboard
         .writeText(text)
-        .then(() => toast.success("Copied to clipboard"))
+        .then(() => toast.success("Copied — paste it on LinkedIn"))
         .catch(() => toast.error("Couldn't copy to clipboard."));
 
       const hasLinkedInUrl = !!contact.linkedinUrl;
@@ -621,7 +621,7 @@ const ACTION_LABELS: Record<string, string> = {
   // appeared in the chat above.
   draft_reply_send_and_anchor: "Drafted send-and-anchor",
   draft_reply_send_a_hold: "Drafted send-a-hold",
-  draft_reply_easier_on_call: "Drafted 'easier on a call'",
+  draft_reply_easier_on_call: "Drafted 'easier on a coffee chat'",
   draft_reply_link_plus_meeting: "Drafted link-plus-meeting",
   draft_reply_confirmed_applied: "Drafted 'confirmed applied'",
   draft_reply_warm_intro: "Drafted warm-intro ask",

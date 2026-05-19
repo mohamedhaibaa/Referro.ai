@@ -320,20 +320,16 @@ def _sent_state_text(state: str, first: str) -> str:
     """
     if state == SENT:
         return (
-            f"Sent! 📤 Ball's in {first}'s court. When they reply, "
-            "paste it below and I'll figure out the next move. Or if "
-            "they go quiet, you can draft a bump."
+            f"Sent! Let's see what happens. When {first} replies, "
+            "paste it below."
         )
     if state == FU1_SENT:
         return (
-            f"Follow-up sent. When {first} replies, paste it below "
-            "and I'll read it. Or send one final bump if they're "
-            "still quiet."
+            f"Bump sent. When {first} replies, paste it here."
         )
     # FU2_SENT
     return (
-        f"Final bump sent. When {first} replies, paste it below. If "
-        "they don't, that's data — we pivot."
+        f"Final bump sent. If {first} doesn't reply, that's data."
     )
 
 
@@ -524,7 +520,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": "Discarded that follow-up. Back where we were."},
+                    "content": {"text": "Scrapped it. Back where we were."},
                 },
                 {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _sent_state_buttons(revert_to)},
             ],
@@ -560,7 +556,7 @@ def _generate_ref_response(
                     "role": ROLE_REF, "kind": KIND_TEXT,
                     "content": {
                         "text": (
-                            "Drafted a follow-up. Tweak it, or hit \"Looks fire\" "
+                            "Drafted a bump. Tweak if needed, or hit \"Looks fire\" "
                             "when ready."
                         ),
                     },
@@ -586,8 +582,8 @@ def _generate_ref_response(
                     "role": ROLE_REF, "kind": KIND_TEXT,
                     "content": {
                         "text": (
-                            "Drafted the final follow-up — the graceful close. "
-                            "Tweak it, or hit \"Looks fire\" when ready."
+                            "Drafted the final bump — the graceful close. "
+                            "Tweak if needed, or hit \"Looks fire\" when ready."
                         ),
                     },
                 },
@@ -615,7 +611,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": "Undone — back to waiting for their reply."},
+                    "content": {"text": "Pulled that back. Waiting again."},
                 },
             ],
             side_effects=[UndoReplied()],
@@ -677,7 +673,7 @@ def _generate_ref_response(
         return RefResponse(messages=[
             {
                 "role": ROLE_REF, "kind": KIND_TEXT,
-                "content": {"text": "Here's the play — copy it, send on LinkedIn, then come back."},
+                "content": {"text": "Here's the play — copy it, send, come back when they reply."},
             },
             {
                 "role": ROLE_REF, "kind": KIND_DRAFT,
@@ -704,7 +700,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": "Undone — back to draft mode. Tweak away."},
+                    "content": {"text": "Pulled back. Tweak it."},
                 },
                 {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=include_undo)},
             ],

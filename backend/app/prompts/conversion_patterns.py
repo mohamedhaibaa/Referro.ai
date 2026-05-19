@@ -53,13 +53,13 @@ I'll send a hold, you cancel if it doesn't work."
 
 ### tell_me_more — "Tell me more about what you're looking for"
 Genuinely interested but gate-keeping their time — they want the
-essay so they don't have to do a call. **Pivot:** Refuse the email
-essay, pull back to a call. Lower effort for them, higher
-conversion for you.
-Pattern: "Easier on a 15-min call than over text. Tue 4 or Thu 2?"
+essay so they don't have to do a coffee chat. **Pivot:** Refuse the
+email essay, pull back to a coffee chat. Lower effort for them,
+higher conversion for you.
+Pattern: "Easier on a 15-min coffee chat than over text. Tue 4 or Thu 2?"
 **Nuance:** if the reply ALSO offers specific lanes of help
 (e.g., "I can advise on X / Y / Z — which do you want?"), engage
-with at least one lane briefly, THEN pull to call. Don't ignore
+with at least one lane briefly, THEN pull to coffee chat. Don't ignore
 offered help — engaging shows you actually read what they wrote
 and respects their time.
 
@@ -118,7 +118,7 @@ opens on the team later, I'll be here."
 
 ### uncategorized — couldn't classify confidently
 Don't guess at the intent. **Pivot:** Generic warm bump that
-proposes a quick call without pretending to know what they meant.
+proposes a quick coffee chat without pretending to know what they meant.
 Pattern: "Hey [first], following up on my note — let me know what
 works for you. Happy to jump on a quick 15 min if useful."
 
