@@ -2,7 +2,7 @@
 
 **Branch:** `feat/REF-33b-resume-frontend`
 **Status:** ready for review
-**Merged:** commit `<merge-sha>`, PR #N
+**Merged:** commit `65a510e`, PR #20
 **Size:** **L** (~+1200 net code lines; pure frontend, zero backend
 or schema changes)
 

@@ -544,7 +544,7 @@ Splits into 2 tickets:
   receive rich context the moment a user uploads. Sized M-L (+710 net
   code lines).
 - **Ticket 7b (frontend)**: **REF-33b shipped 2026-05-18 (commit
-  `<merge-sha>`, PR #N)** — `/onboarding/resume` post-signup step,
+  `65a510e`, PR #20)** — `/onboarding/resume` post-signup step,
   new `/resume` page (sidebar link finally resolves), shared
   `ResumeUploadCard` + `ParsedFieldsEditor` with inline `<TagInput>`,
   dismissible `ResumeNudgeBanner` on Home (sessionStorage scope per
@@ -694,7 +694,7 @@ existing AI functions (`generate_initial_draft`, `revise_draft`,
 through immediately on resume upload. Sized M-L (+710 net code
 lines). REF-33b frontend follows.
 2026-05-18 — REF-33b shipped (Issue 7b frontend, commit
-`<merge-sha>`, PR #N): `/onboarding/resume` post-signup step,
+`65a510e`, PR #20): `/onboarding/resume` post-signup step,
 new `/resume` page (Sidebar's `FileText` link finally resolves),
 shared `ResumeUploadCard` + `ParsedFieldsEditor` (per-field
 structured editor with inline `<TagInput>` and "edited" badges),
