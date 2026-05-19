@@ -20,6 +20,8 @@ import InterviewPrep from "./pages/InterviewPrep";
 import PitchDeck from "./pages/PitchDeck";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import OnboardingResume from "./pages/OnboardingResume";
+import Resume from "./pages/Resume";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -45,6 +47,8 @@ const App = () => (
               <Route path="/jobs/:id/contacts/:contactId/coffee-chat-prep" element={<ProtectedRoute><CoffeeChatPrep /></ProtectedRoute>} />
               <Route path="/jobs/:id/contacts/:contactId/interview-prep" element={<ProtectedRoute><InterviewPrep /></ProtectedRoute>} />
               <Route path="/jobs/:id/contacts/:contactId/pitch-deck" element={<ProtectedRoute><PitchDeck /></ProtectedRoute>} />
+              <Route path="/onboarding/resume" element={<ProtectedRoute><OnboardingResume /></ProtectedRoute>} />
+              <Route path="/resume" element={<ProtectedRoute><Resume /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

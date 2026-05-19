@@ -543,12 +543,15 @@ Splits into 2 tickets:
   (`generate_initial_draft`, `revise_draft`, `generate_followup`) now
   receive rich context the moment a user uploads. Sized M-L (+710 net
   code lines).
-- **Ticket 7b (frontend)**: signup wizard step at `/onboarding/resume`,
-  `/settings` page with `Resume & Background` section, parsed-fields
-  editor (per-field structured input — DQ-D), dismissible
-  ResumeNudgeBanner on dashboard for thin-context users (DQ-E),
-  UserMenu dropdown linking to Settings (DQ-H). **Depends on REF-33a
-  deploy.** Sized L (~+890 frontend lines).
+- **Ticket 7b (frontend)**: **REF-33b shipped 2026-05-18 (commit
+  `<merge-sha>`, PR #N)** — `/onboarding/resume` post-signup step,
+  new `/resume` page (sidebar link finally resolves), shared
+  `ResumeUploadCard` + `ParsedFieldsEditor` with inline `<TagInput>`,
+  dismissible `ResumeNudgeBanner` on Home (sessionStorage scope per
+  DQ-E). Sized L (+1006 net code lines). **Scope correction during
+  build:** built `Resume.tsx` at `/resume` instead of `Settings.tsx`
+  at `/settings` — the sidebar already wired `/resume`. Q1 lean
+  skipped a separate UserMenu dropdown. **Issue 7 closed.**
 
 #### 7a — Backend (resume upload + parsing) — **Shipped (REF-33a)**
 
@@ -560,10 +563,33 @@ upload always succeeds; empty parse returns 201 with
 `parse_failed=true` for the frontend to surface. Detail in
 `/docs/modifications/REF-33a.md`.
 
-#### 7b — Frontend (signup wizard + settings page + nudge banner)
+#### 7b — Frontend (signup wizard + resume page + nudge banner) — **Shipped (REF-33b)**
 
-Blocked on 7a deploy. See REF-33 recon for design questions already
-locked (DQ-A through DQ-L).
+Post-signup `/onboarding/resume` route with upload + skip + parse-
+failure recovery. New `/resume` page (Sidebar's `FileText` link
+finally resolves) with `ParsedFieldsEditor` (per-field structured
+inputs + "edited" badges + dirty-only PATCH), `[Replace resume]`
+with manual-edit-preservation toast (DQ-K UX surface), and
+destructive `[Delete my resume data]` AlertDialog (DQ-F).
+`ResumeNudgeBanner` on Home with sessionStorage dismissal (DQ-E).
+Shared `ResumeUploadCard` between onboarding + resume pages.
+Inline `<TagInput>` inside `ParsedFieldsEditor` (Q5 — no
+chip-input component existed; used 4× in one file).
+
+**Scope correction during build:** plan called it `Settings.tsx`
+at `/settings`; sidebar already wired `/resume`. Built `Resume.tsx`
+at `/resume` instead, leaving `/settings` unowned for a future
+ticket. Detail in `/docs/modifications/REF-33b.md`.
+
+**Magic-moment proof:** with Mohamed's real resume, REF-32's
+`generate_followup` on Janani's reply now produces a draft that
+references real skills ("SQL, API design, and data engineering")
+and engages with the "technical guidance" lane — vs. the thin-
+context baseline ("insights into the role and team dynamics") that
+fabricated nothing but grounded nothing either. End-to-end value
+of REF-33a + REF-33b confirmed.
+
+**Issue 7 closed** — both sub-tickets shipped.
 
 #### Updates
 
@@ -667,3 +693,21 @@ existing AI functions (`generate_initial_draft`, `revise_draft`,
 `generate_followup`) threaded with `db` so rich UserContext flows
 through immediately on resume upload. Sized M-L (+710 net code
 lines). REF-33b frontend follows.
+2026-05-18 — REF-33b shipped (Issue 7b frontend, commit
+`<merge-sha>`, PR #N): `/onboarding/resume` post-signup step,
+new `/resume` page (Sidebar's `FileText` link finally resolves),
+shared `ResumeUploadCard` + `ParsedFieldsEditor` (per-field
+structured editor with inline `<TagInput>` and "edited" badges),
+dismissible `ResumeNudgeBanner` on Home (sessionStorage scope per
+DQ-E), snake↔camel transform in `lib/api/profile.ts` so REF-33a
+backend stays untouched. Scope correction during build: built
+`Resume.tsx` at `/resume` instead of `Settings.tsx` at
+`/settings` (Sidebar.tsx:14 already wired `/resume`); `/settings`
+stays unowned until a future ticket. Q1 skipped UserMenu dropdown
+(sidebar already has Settings icon). Sized L (+1006 net code
+lines). Magic-moment proof: with Mohamed's real resume,
+`generate_followup` on Janani's reply now references "SQL, API
+design, and data engineering" + engages with the "technical
+guidance" lane — vs. thin-context baseline "insights into the
+role and team dynamics" that grounded nothing. **Issue 7
+closed** — REF-33a + REF-33b ship together.

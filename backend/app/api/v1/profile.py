@@ -153,9 +153,22 @@ def upload_resume(
         logger.exception("Blob upload failed for user=%s", current_user.id)
         raise HTTPException(status_code=500, detail="Failed to store resume")
 
-    # Extract + parse
-    raw_text = extract_text(file.filename or f"resume{ext}", content)
+    # Extract + parse.
+    # REF-33b Bug B fix: extract_text now returns (text, error_info).
+    # When extraction throws (e.g. transient python-docx flake), the
+    # exception details land in parsed["raw_ai_response"] under
+    # "_extraction_error" so a future debug can query user_profiles
+    # for the failure cause. parse_resume itself is unchanged — it
+    # still returns _empty_parse_result on empty input.
+    raw_text, extract_error = extract_text(file.filename or f"resume{ext}", content)
     parsed = parse_resume(raw_text)
+    if extract_error is not None:
+        # Replace whatever parse_resume put in raw_ai_response (None for
+        # the empty-input early return) with the extraction error info.
+        # Future-self debugging surface: query
+        #   SELECT user_id, parse_raw_response FROM user_profiles
+        #   WHERE parse_raw_response ? '_extraction_error';
+        parsed["raw_ai_response"] = {"_extraction_error": extract_error}
     parse_failed = not any([
         parsed["skills"], parsed["experience_years"],
         parsed["experience_summary"], parsed["education"],
