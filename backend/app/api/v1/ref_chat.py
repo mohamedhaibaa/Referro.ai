@@ -1327,7 +1327,7 @@ def post_chat(
             .order_by(RefChatMessage.created_at.asc())
             .all()
         )
-        ai_result = generate_initial_draft(contact, job, current_user, chat_history)
+        ai_result = generate_initial_draft(contact, job, current_user, chat_history, db)
 
     elif kind == "text" and state in DRAFT_STATES:
         # revise_draft works on any draft (initial / followup_1 / followup_2);
@@ -1345,7 +1345,7 @@ def post_chat(
         edit_number = DRAFT_EDITS_INITIAL - max(0, edits_left_after or 0)
         ai_result = revise_draft(
             contact, job, current_user, chat_history,
-            current_draft, user_instruction, edit_number,
+            current_draft, user_instruction, edit_number, db,
         )
 
     elif kind == "reply_paste":
@@ -1387,7 +1387,7 @@ def post_chat(
         if last_reply is not None and intent_for_followup is not None:
             try:
                 job_for_followup = _load_job_owned(job_id, current_user, db)
-                user_ctx = build_user_context(current_user)
+                user_ctx = build_user_context(current_user, db)
                 initial_text = _initial_outreach_text_for_contact(db, contact)
                 followup_ai_result = generate_followup(
                     contact=contact,

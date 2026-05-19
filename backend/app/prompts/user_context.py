@@ -1,19 +1,26 @@
 """User context block for Ref AI calls.
 
-REF-32 promotion (was a 21-line stub): exports a UserContext
-dataclass + builder + renderer. v1 fields populate from the User
-row today; v2 fields (resume-derived) default empty and will be
-populated when REF-33 ships the resume parser + user_profiles
-table.
+REF-32 promotion + REF-33a wiring.
 
-The old zero-arg `build_user_context_block()` shim is preserved so
-generate_initial_draft / revise_draft keep their current behavior
-(emit the "Not provided yet" placeholder via ref_context.py's
-fallback path). REF-33 will swap those callers to the new
-build_user_context(user) path.
+UserContext dataclass holds both v1 (name/email — populated from
+User row) and v2 (resume-derived: skills, experience_*, education,
+job_titles_history, target_*, raw_resume_text) fields.
+
+REF-33a wires the v2 fields up: build_user_context(user, db)
+JOINs the new user_profiles table and populates v2 when a profile
+exists. Users without a profile row keep is_thin()=True; the
+prompt's §3 thin-context branch handles that case identically to
+REF-32 behavior.
+
+The zero-arg build_user_context_block() shim is kept as backward-
+compat insurance. REF-33a swapped all known callers
+(generate_initial_draft, revise_draft) to the new path; the shim
+remains only as a defensive landing for anything missed by grep.
 """
 
 from dataclasses import dataclass, field
+
+from sqlalchemy.orm import Session
 
 from app.db.models.user import User
 
@@ -60,19 +67,39 @@ class UserContext:
         )
 
 
-def build_user_context(user: User) -> UserContext:
-    """REF-32 (DD-1): build UserContext from a User row.
+def build_user_context(user: User, db: Session) -> UserContext:
+    """REF-33a: JOIN user_profiles to populate v2 fields when a
+    profile exists.
 
-    v1: only name + email populate; v2 fields stay defaulted.
-    REF-33 will extend the signature to accept the db session and
-    JOIN a user_profiles row, keeping callers unchanged.
+    Backward compat: if no UserProfile row → v2 fields stay
+    defaulted → UserContext.is_thin() returns True → the prompt's
+    §3 thin-context branch handles. Identical thin behavior to
+    pre-REF-33a.
+
+    Local import for UserProfile avoids a top-level circular
+    (user_context is imported by ref_ai which is imported by
+    routes that also import the User model).
     """
+    from app.db.models.user import UserProfile
+
     name = user.name or ""
     first = name.split(" ")[0] if name else ""
+    email = user.email or ""
+
+    profile = db.query(UserProfile).filter(UserProfile.user_id == user.id).first()
+    if profile is None:
+        return UserContext(full_name=name, first_name=first, email=email)
+
     return UserContext(
-        full_name=name,
-        first_name=first,
-        email=user.email or "",
+        full_name=name, first_name=first, email=email,
+        skills=profile.skills or [],
+        experience_years=profile.experience_years,
+        experience_summary=profile.experience_summary or "",
+        education=profile.education or "",
+        job_titles_history=profile.job_titles_history or [],
+        target_roles=profile.target_roles or [],
+        target_companies=profile.target_companies or [],
+        raw_resume_text=profile.raw_resume_text,
     )
 
 
@@ -104,14 +131,12 @@ def render_user_context_block(ctx: UserContext) -> str:
 
 
 def build_user_context_block() -> None:
-    """Backward-compat shim for generate_initial_draft / revise_draft.
+    """DEPRECATED REF-32-era shim. REF-33a swapped all known callers
+    (generate_initial_draft, revise_draft) to
+    render_user_context_block(build_user_context(user, db)).
 
-    Returns None so ref_context.py falls back to the "Not provided
-    yet" placeholder for the existing callers. REF-33 will replace
-    these callers with build_user_context(user) +
-    render_user_context_block(ctx).
-
-    Kept to avoid behavior changes in generate_initial_draft /
-    revise_draft as part of REF-32.
+    Kept as backward-compat insurance for anything grep missed at
+    REF-33a time. Remove in a future cleanup ticket once we're
+    certain no caller remains.
     """
     return None

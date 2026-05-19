@@ -1,9 +1,10 @@
 from fastapi import APIRouter
-from app.api.v1 import auth, jobs, contacts, outreach, follow_up, flash_cards, pitch_deck, attachments, dashboard, inbox, notes, activity, workflow_runs, credits, ref_chat
+from app.api.v1 import auth, jobs, contacts, outreach, follow_up, flash_cards, pitch_deck, attachments, dashboard, inbox, notes, activity, workflow_runs, credits, ref_chat, profile
 
 router = APIRouter()
 
 router.include_router(auth.router, prefix="/auth", tags=["auth"])
+router.include_router(profile.router, prefix="/profile", tags=["profile"])
 router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 router.include_router(contacts.router, prefix="/jobs", tags=["contacts"])
 router.include_router(outreach.router, prefix="/jobs", tags=["outreach"])

@@ -11,11 +11,13 @@ from typing import Optional
 import httpx
 
 from app.core.config import settings
+from sqlalchemy.orm import Session
+
 from app.db.models.job import Contact, RefChatMessage
 from app.db.models.user import User
 from app.prompts.ref_context import build_ref_context
 from app.prompts.ref_system_prompt import REF_SYSTEM_PROMPT
-from app.prompts.user_context import build_user_context_block
+from app.prompts.user_context import build_user_context, render_user_context_block
 
 logger = logging.getLogger(__name__)
 
@@ -67,13 +69,20 @@ def generate_initial_draft(
     job: "object",
     user: User,
     chat_history: list[RefChatMessage],
+    db: Session,
 ) -> dict:
     """Generate the first outreach draft for a contact.
 
     Returns {"chat": str, "draft": str, "play": str}.
     Falls back to a simple template on AI failure.
+
+    REF-33a: db parameter threaded through so build_user_context
+    can JOIN user_profiles. Rich context flows into the prompt
+    when the user has uploaded a resume; thin-context behavior
+    (the "Resume not yet provided" marker) is unchanged for
+    users without a profile row.
     """
-    user_context = build_user_context_block()
+    user_context = render_user_context_block(build_user_context(user, db))
     context = build_ref_context(contact, job, user, chat_history, user_context)
 
     first = (contact.full_name or "there").split(" ")[0]
@@ -104,13 +113,16 @@ def revise_draft(
     current_draft: str,
     user_instruction: str,
     edit_number: int,
+    db: Session,
 ) -> dict:
     """Revise an existing draft based on the user's instruction.
 
     Returns {"chat": str, "draft": str}.
     Falls back to echoing the instruction on AI failure.
+
+    REF-33a: db threaded through (see generate_initial_draft).
     """
-    user_context = build_user_context_block()
+    user_context = render_user_context_block(build_user_context(user, db))
     context = build_ref_context(contact, job, user, chat_history, user_context)
 
     instruction = (
@@ -243,6 +255,75 @@ def parse_reply(
             ),
             "reasoning": "AI classification failed; defaulted to uncategorized.",
         }
+
+
+def _empty_parse_result() -> dict:
+    """REF-33a: all-empty parse_resume fallback."""
+    return {
+        "skills": [],
+        "experience_years": None,
+        "experience_summary": "",
+        "education": "",
+        "job_titles_history": [],
+        "raw_ai_response": None,
+    }
+
+
+def parse_resume(raw_text: str, file_meta: dict | None = None) -> dict:
+    """REF-33a: extract structured profile fields from resume text.
+
+    Returns:
+        {
+          "skills": list[str],
+          "experience_years": int | None,
+          "experience_summary": str,
+          "education": str,
+          "job_titles_history": list[str],
+          "raw_ai_response": dict | None,
+        }
+
+    Failure mode: returns all-empty fields (the upload endpoint
+    still succeeds with parse_failed=true so the user can manually
+    PATCH via the settings page). Same defensive posture as
+    parse_reply.
+
+    Token / cost (gpt-4o-mini): ~$0.0009/call. Temperature 0.2.
+    """
+    from app.prompts.resume_parser import RESUME_PARSER_SYSTEM_PROMPT
+
+    if not raw_text or not raw_text.strip():
+        logger.info("parse_resume: empty input, returning empty fields")
+        return _empty_parse_result()
+
+    # Truncate at 20K chars to bound token cost on absurdly long
+    # inputs (8-page resumes still fit comfortably).
+    user_message = (
+        f"## Resume text\n<resume>\n{raw_text[:20000]}\n</resume>\n\n"
+        "Extract and return JSON."
+    )
+
+    try:
+        raw = _call_ai_foundry_with_temp(
+            RESUME_PARSER_SYSTEM_PROMPT,
+            user_message,
+            temperature=0.2,
+        )
+        parsed = _parse_ref_response(raw)
+        for key in ("skills", "experience_years", "experience_summary",
+                    "education", "job_titles_history"):
+            if key not in parsed:
+                raise ValueError(f"Missing required key in parse_resume response: {key}")
+        return {
+            "skills": parsed["skills"] if isinstance(parsed["skills"], list) else [],
+            "experience_years": parsed["experience_years"] if isinstance(parsed["experience_years"], int) else None,
+            "experience_summary": str(parsed["experience_summary"] or ""),
+            "education": str(parsed["education"] or ""),
+            "job_titles_history": parsed["job_titles_history"] if isinstance(parsed["job_titles_history"], list) else [],
+            "raw_ai_response": parsed,
+        }
+    except Exception:
+        logger.exception("parse_resume failed, returning empty fields")
+        return _empty_parse_result()
 
 
 def _build_contact_summary_for_followup(contact: Contact, job: "object") -> str:
