@@ -281,6 +281,21 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
         window.open(contact.linkedinUrl!, "_blank", "noopener,noreferrer");
       }
 
+      // REF-34 fix (Commit 2 hotfix): in non-DRAFT states (e.g., REPLIED
+      // post-draft auto-stream from _reply_paste_stream, or the historical
+      // REF-31 draft_reply_* branch), send_message is just a copy-and-open
+      // action — there's no mark_sent transition to chain to (the original
+      // outreach was already sent; the user is copying a follow-up reply).
+      // REF-23's sendArmed → confirm → mark_sent flow was designed only
+      // for the DRAFTED → SENT path. Skip the chain for non-DRAFT states.
+      // (Piece 4's copy_link_clicked event will capture the "user actually
+      // sent it" signal without the confirm dialog.)
+      const isDraftState =
+        status === STATES.DRAFTED ||
+        status === STATES.FOLLOWUP_1_DRAFTED ||
+        status === STATES.FOLLOWUP_2_DRAFTED;
+      if (!isDraftState) return;
+
       setSendArmed(true);
       if (!hasLinkedInUrl) {
         // No tab-switch will happen; prompt immediately.
@@ -431,7 +446,11 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
             sendArmed={sendArmed}
           />
         ))}
-        {(send.isPending || updateOutreach.isPending) && <TypingIndicator />}
+        {/* REF-34: send.isDrafting flips true between reply_paste chunk 1
+            and chunk 2 — keeps TypingIndicator visible during the
+            generate_followup wait so the user sees "Ref is drafting..."
+            after the classification chip arrives. */}
+        {(send.isPending || updateOutreach.isPending || send.isDrafting) && <TypingIndicator />}
       </div>
 
       {/* REF-23 / REF-27: send-message confirmation. Escape calls
