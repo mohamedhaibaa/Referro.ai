@@ -451,6 +451,61 @@ Three prompt-iteration cycles required to clear the strict
 Janini gate on gpt-4o-mini — see mod record's "Build iteration
 history" section. Detail in `/docs/modifications/REF-32.md`.
 
+#### 6h — Rich-context prompt tuning — **Shipped (REF-35) with documented limitations**
+
+Builds on REF-33's resume integration. `parse_resume` prompt
+tightened to preserve distinctive signals verbatim (named
+employers, sectors, institutions — Mohamed's summary now
+contains "Al Ramz Corporation on the Abu Dhabi Securities
+Exchange", "Canada Revenue Agency", "Michelin Canada" instead
+of the previous "various sectors"). `generate_followup` §3
+rich-context branch expanded with MUST rules (name employer,
+reference target company, preserve sector signals), tone-
+matching guidance with emoji-mirror example, and explicit
+strict branch-gate preamble. §5 opener block extended with
+casual-reactive + acknowledge-and-engage permitted shapes
+(REF-32's "Hi {first}, thanks" ban preserved). §7 hard-rules
+summary elevated three rules (name target company, vary
+openers, body variation). `render_user_context_block` skills
+cap raised 10 → 20 so distinctive skills like "capital
+markets" (position 18 in Mohamed's profile) reach the AI
+prompt.
+
+**Acceptance — Path (b) ship-with-documented-limitations.**
+The strict gate (6/6 base criteria + diversity ≥2 on both
+tests) was not met. Two cycles attempted on gpt-4o-mini; the
+model's soft ceiling on negative style/diversity rules in long
+prompts is the limiting factor. **Wins shipped:** parser
+signal preservation (5/5), rich-context employer naming (5/5
+Test A, 4/5 Test B), sector-signal citation (4/5 both tests),
+casual register attempt (4/5 casual openers, 1/5 emoji
+landed), zero fabrication (5/5 both tests). **Four known
+limitations:** opener diversity locks (1 pattern across 5
+runs), target-company naming inconsistent (2/5 Test A), thin-
+context cross-contamination (~33% leak rate), char-limit
+drift on rich drafts that pack many signals (2/5 Test A at
+401-408 chars). Detail in `/docs/modifications/REF-35.md`.
+
+**Documented fix for the four limitations: gpt-4o upgrade.**
+Evidence across REF-32 cycles 1-3 and REF-35 cycles 1-2 is
+consistent — gpt-4o-mini follows positive content rules but
+ignores negative style rules in long prompts. The five
+cycle-2 levers that did not measurably help on gpt-4o-mini
+are kept in the prompt intentionally; they may be load-bearing
+on gpt-4o, so the upgrade should be a config-level swap not a
+re-tuning project. **Trigger criteria:** real users report
+drafts feeling repetitive in outreach campaigns OR quality bar
+shifts to "consistently varied across many sends." Provisioning
+steps captured in `/docs/modifications/REF-35.md` "Path
+forward" section. Cost delta: ~10× per call ($0.01 → $0.10 per
+user-per-month at modest scale; trivial absolute).
+
+**Side effect of build testing:** Mohamed's resume profile
+re-parsed once during cycle 1, producing the signal-preserved
+`experience_summary` that's now stored. Other users keep the
+flatter summary until they re-upload via the Resume page or a
+future background re-parse job ships.
+
 #### 6f — Per-category intelligence — **Shipped (REF-31)**
 
 Carve-out from REF-30. `INTENT_TO_REF_TEXT` (10 entries) gives each
@@ -522,6 +577,20 @@ prompt-iteration cycles to clear strict Janini gate on gpt-4o-mini
 word-injection in cycle 2; HARD-RULE openers + pattern bans in
 cycle 3). Foundation-ready UserContext dataclass for REF-33.
 Shared CONVERSION_PATTERNS module via string-concat splice.
+
+2026-05-19 — REF-35 shipped (Issue 6h, rich-context prompt
+tuning) — Path (b) ship-with-documented-limitations. Parser
+preserves distinctive signals (Al Ramz / CRA / Michelin / ADX);
+generator §3 rich-context branch expanded with MUST rules + tone
+matching; §5 +2 opener patterns; §7 +3 elevated rules; skills
+cap 10 → 20. Two prompt cycles attempted on gpt-4o-mini; strict
+gate (6/6 + diversity ≥2) not met but real wins shipped
+(employer naming 5/5 Test A; sector signal 4/5 both tests; zero
+fabrication 5/5). Four known limitations (diversity locks,
+target-company naming inconsistency, ~33% thin-context
+cross-contamination, char-limit drift) documented in mod record
+with gpt-4o upgrade as the architectural fix when users
+encounter them at scale.
 
 ---
 
@@ -711,3 +780,24 @@ design, and data engineering" + engages with the "technical
 guidance" lane — vs. thin-context baseline "insights into the
 role and team dynamics" that grounded nothing. **Issue 7
 closed** — REF-33a + REF-33b ship together.
+2026-05-19 — REF-35 shipped (Issue 6h, commit `<merge-sha>`, PR #N):
+rich-context prompt tuning — Path (b) ship-with-documented-
+limitations. `parse_resume` now preserves distinctive signals
+verbatim (Mohamed's summary: "various sectors..." →
+"Al Ramz Corporation on the Abu Dhabi Securities Exchange,
+Canada Revenue Agency, Michelin Canada"). `generate_followup`
+§3 rich-context branch expanded ~12 → ~95 lines (MUST rules +
+tone matching with emoji-mirror example + strict branch-gate);
+§5 + casual-reactive and acknowledge-and-engage opener
+patterns (REF-32 "Hi {first}, thanks" ban preserved); §7 + 3
+elevated rules. `skills[:10]` → `skills[:20]` in
+`render_user_context_block` so "capital markets" (position 18)
+reaches the AI. Sized S/M (+193 net code lines). Two cycles
+attempted on gpt-4o-mini; strict gate not met. **Four
+documented limitations** (opener diversity locks, target-
+company naming inconsistency, ~33% thin-context cross-
+contamination, char-limit drift on rich drafts) ship with the
+release. **gpt-4o upgrade** is the architectural fix; trigger
+when real users encounter the limitations at scale; provisioning
+steps captured in mod record. Mohamed's resume re-parsed during
+cycle 1 testing — his stored summary is now signal-preserved.

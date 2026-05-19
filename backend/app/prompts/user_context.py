@@ -114,7 +114,10 @@ def render_user_context_block(ctx: UserContext) -> str:
     if ctx.experience_summary:
         lines.append(f"- Summary: {ctx.experience_summary}")
     if ctx.skills:
-        lines.append(f"- Skills: {', '.join(ctx.skills[:10])}")
+        # REF-35: raised cap 10 → 20 so distinctive skills near the
+        # end of the list (e.g., "capital markets" at position 18
+        # in Mohamed's profile) reach the AI prompt.
+        lines.append(f"- Skills: {', '.join(ctx.skills[:20])}")
     if ctx.experience_years is not None:
         lines.append(f"- Experience: {ctx.experience_years} years")
     if ctx.education:
