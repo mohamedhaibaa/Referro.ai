@@ -45,10 +45,10 @@ VALID_CONFIDENCE_LEVELS: set[str] = {"low", "med", "high"}
 # recommendation. Different signals (DQ-E).
 INTENT_TO_REF_TEXT: dict[str, str] = {
     "yes_to_coffee_chat":   "We're in! Let's lock the time before momentum dies.",
-    "send_resume":          "Nice — they want the resume. Send it AND anchor a meeting in the same message, so it doesn't disappear into the void.",
+    "send_resume":          "Nice — they want the resume. Send it AND anchor a coffee chat in the same message, so it doesn't disappear.",
     "im_slammed":           "They're busy. Take-away play: propose a specific future time so they don't have to volunteer their schedule.",
-    "tell_me_more":         "They're gate-keeping with an essay request. Pull back to a quick call — easier for both of you.",
-    "send_job_link":        "Positive signal. Send the link AND ask for the meeting in the same reply.",
+    "tell_me_more":         "They're gate-keeping with an essay request. Pull back to a quick coffee chat — easier for both of you.",
+    "send_job_link":        "Positive signal. Send the link AND ask for the coffee chat in the same reply.",
     "apply_through_portal": "Apply the same day. Reply confirming you applied. Then check back in 5-7 days.",
     "not_right_person":     "Helpful redirect. The biggest gift here is a warm intro — ask them to mention you to the right person.",
     "maybe_later":          "Don't leave it vague. Pin a specific future date so it doesn't drift.",
@@ -77,7 +77,7 @@ INTENT_TO_DRAFT_TEMPLATE: dict[str, str] = {
         "I'll send a hold, you cancel if it doesn't work."
     ),
     "tell_me_more": (
-        "Easier on a 15-min call than over text. Tue 4 or Thu 2?"
+        "Easier on a 15-min coffee chat than over text. Tue 4 or Thu 2?"
     ),
     "send_job_link": (
         "[paste job URL]. Quick one — would 15 min Tue 4pm or Thu 2pm "

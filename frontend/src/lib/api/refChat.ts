@@ -31,3 +31,24 @@ export async function postRefChat(
   const res = await api.post<PostResponse>(`/jobs/${jobId}/contacts/${contactId}/ref-chat`, body);
   return res.data;
 }
+
+// REF-34: chunked NDJSON response for reply_paste flow.
+// Chunk 1 = classification chip + Ref text (after parse_reply ~3-5s).
+// Chunk 2 = draft_card + final action_buttons (after generate_followup ~3-7s).
+export interface RefChatStreamChunk {
+  chunk: 1 | 2;
+  newMessages: RefChatMessage[];
+}
+
+export async function streamRefChatReply(
+  jobId: string,
+  contactId: string,
+  body: PostRefChatBody,
+  onChunk: (payload: RefChatStreamChunk) => void,
+): Promise<void> {
+  await api.stream<RefChatStreamChunk>(
+    `/jobs/${jobId}/contacts/${contactId}/ref-chat`,
+    body,
+    onChunk,
+  );
+}

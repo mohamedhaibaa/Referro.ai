@@ -12,6 +12,8 @@ Lifecycle invariant: this router does NOT directly mutate `lifecycle_status` or
   - For marking sent, we return `requires_followup="mark_sent"` and the
     frontend calls the existing `useUpdateOutreach` to PATCH `sent_at`.
 """
+import asyncio
+import json
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -19,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -320,20 +323,16 @@ def _sent_state_text(state: str, first: str) -> str:
     """
     if state == SENT:
         return (
-            f"Sent! 📤 Ball's in {first}'s court. When they reply, "
-            "paste it below and I'll figure out the next move. Or if "
-            "they go quiet, you can draft a bump."
+            f"Sent! Let's see what happens. When {first} replies, "
+            "paste it below."
         )
     if state == FU1_SENT:
         return (
-            f"Follow-up sent. When {first} replies, paste it below "
-            "and I'll read it. Or send one final bump if they're "
-            "still quiet."
+            f"Bump sent. When {first} replies, paste it here."
         )
     # FU2_SENT
     return (
-        f"Final bump sent. When {first} replies, paste it below. If "
-        "they don't, that's data — we pivot."
+        f"Final bump sent. If {first} doesn't reply, that's data."
     )
 
 
@@ -524,7 +523,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": "Discarded that follow-up. Back where we were."},
+                    "content": {"text": "Scrapped it. Back where we were."},
                 },
                 {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _sent_state_buttons(revert_to)},
             ],
@@ -560,7 +559,7 @@ def _generate_ref_response(
                     "role": ROLE_REF, "kind": KIND_TEXT,
                     "content": {
                         "text": (
-                            "Drafted a follow-up. Tweak it, or hit \"Looks fire\" "
+                            "Drafted a bump. Tweak if needed, or hit \"Looks fire\" "
                             "when ready."
                         ),
                     },
@@ -586,8 +585,8 @@ def _generate_ref_response(
                     "role": ROLE_REF, "kind": KIND_TEXT,
                     "content": {
                         "text": (
-                            "Drafted the final follow-up — the graceful close. "
-                            "Tweak it, or hit \"Looks fire\" when ready."
+                            "Drafted the final bump — the graceful close. "
+                            "Tweak if needed, or hit \"Looks fire\" when ready."
                         ),
                     },
                 },
@@ -615,7 +614,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": "Undone — back to waiting for their reply."},
+                    "content": {"text": "Pulled that back. Waiting again."},
                 },
             ],
             side_effects=[UndoReplied()],
@@ -677,7 +676,7 @@ def _generate_ref_response(
         return RefResponse(messages=[
             {
                 "role": ROLE_REF, "kind": KIND_TEXT,
-                "content": {"text": "Here's the play — copy it, send on LinkedIn, then come back."},
+                "content": {"text": "Here's the play — copy it, send, come back when they reply."},
             },
             {
                 "role": ROLE_REF, "kind": KIND_DRAFT,
@@ -685,10 +684,13 @@ def _generate_ref_response(
             },
             {
                 "role": ROLE_REF, "kind": KIND_ACTIONS,
+                # REF-34 Piece 2: consolidated from 4 buttons (Copy / Open
+                # LinkedIn / Record outcome / Undo replied) to 2.
+                # send_message is REF-23's client-only handler that does
+                # copy + window.open in one click. Record outcome removed —
+                # Piece 4 auto-infers state from events.
                 "content": {"actions": [
-                    _action("📋 Copy", "copy", primary=False),
-                    _action("🔗 Open LinkedIn", "open_linkedin", primary=False),
-                    _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
+                    _action("📋 Copy & open LinkedIn", "send_message", primary=True),
                     _action("↩ Undo replied", ACTION_UNDO, primary=False),
                 ]},
             },
@@ -704,7 +706,7 @@ def _generate_ref_response(
             messages=[
                 {
                     "role": ROLE_REF, "kind": KIND_TEXT,
-                    "content": {"text": "Undone — back to draft mode. Tweak away."},
+                    "content": {"text": "Pulled back. Tweak it."},
                 },
                 {"role": ROLE_REF, "kind": KIND_ACTIONS, "content": _approve_buttons(include_undo=include_undo)},
             ],
@@ -726,13 +728,17 @@ def _action_buttons_for_replied_category(intent: str) -> list[dict]:
     apply_through_portal also gets a leading [🔗 Open LinkedIn] secondary
     so the user can actually go apply.
     """
-    record_outcome = _action("📊 Record outcome", "switch_to_record_outcome", primary=False)
+    # REF-34 Piece 2 (DQ-I dead-code policy):
+    # This function is dead code on the new auto-draft path (stream handler
+    # owns the action buttons). It only fires on historical-click paths
+    # (existing ref_chat_messages rows with draft_reply_* action buttons).
+    # Remove [📊 Record outcome] from all 3 historical paths so users
+    # clicking old buttons get the new minimal UX.
     undo_replied = _action("↩ Undo replied", ACTION_UNDO, primary=False)
 
     if intent == "yes_to_coffee_chat":
         return [
             _action("☕ Schedule coffee chat", "switch_to_schedule_coffee_chat", primary=True),
-            record_outcome,
             undo_replied,
         ]
 
@@ -754,12 +760,11 @@ def _action_buttons_for_replied_category(intent: str) -> list[dict]:
         if intent == "apply_through_portal":
             actions.append(_action("🔗 Open LinkedIn", "open_linkedin", primary=False))
         actions.append(_action(label, kind, primary=True))
-        actions.append(record_outcome)
         actions.append(undo_replied)
         return actions
 
     # Defensive fallback (shouldn't reach here given INTENT_CATEGORIES coverage above).
-    return [record_outcome, undo_replied]
+    return [undo_replied]
 
 
 def _replied_state_response_for_category(
@@ -837,6 +842,205 @@ def _generate_reply_capture_response(
         ],
         side_effects=[CaptureReply(reply_text=reply_text, parsed=parsed)],
     )
+
+
+# --- REF-34: chunked NDJSON stream for reply_paste ---
+
+async def _reply_paste_stream(
+    contact: Contact,
+    job_id: str,
+    user: User,
+    db: Session,
+    body: "RefChatPostRequest",
+):
+    """REF-34: two-stage emission for reply_paste.
+
+    Chunk 1: parse_reply → classification chip + Ref text.
+    Chunk 2: generate_followup → draft_card + final action_buttons.
+
+    Async-handler risks (build-prompt §critical, addressed):
+
+    1. **AI calls wrapped in run_in_executor.** parse_reply and
+       generate_followup are sync ~3-7s each. Calling them directly
+       in an async generator would block the event loop and stall
+       every other request on the worker. Both are wrapped in
+       loop.run_in_executor(None, ...) so they run on a thread.
+
+    2. **Chunk 1 commits BEFORE yielding.** The DB transaction does
+       NOT stay open across the yield boundary. If we held the
+       transaction until chunk 2 commits, we'd hold a connection
+       from the pool for the full 6-12s — pool exhaustion risk
+       under load.
+
+    3. **Chunk 2 try/except with fill_template fallback.** If
+       generate_followup raises after chunk 1 has already yielded,
+       we cannot surface an HTTP error to the user — they'd see a
+       partial UI with classification but no draft. Instead, catch
+       and fall back to REF-31's static fill_template so chunk 2
+       always emits a draft card. Never raise after first yield.
+
+    Event recording (record_event calls for reply_received,
+    reply_classified, draft_generated, meeting_time_confirmed) is
+    deferred to Commit 3 — application_events table doesn't exist
+    yet. TODO Commit 3 markers below.
+    """
+    reply_text = (body.content.get("text") or "").strip()
+    loop = asyncio.get_event_loop()
+
+    # Load job (sync DB, fast)
+    job = _load_job_owned(job_id, user, db)
+
+    # === CHUNK 1: parse_reply + classification chip + Ref text ===
+    try:
+        ai_result = await loop.run_in_executor(
+            None, parse_reply, contact, job, user, reply_text,
+        )
+    except Exception:
+        logger.exception("parse_reply failed in stream handler; using uncategorized fallback")
+        ai_result = {
+            "intent_category": "uncategorized",
+            "confidence": "low",
+            "extracted_data": {},
+            "chat_message": "",
+            "reasoning": "parse_reply exception in stream",
+        }
+
+    # Persist the user's reply-paste bubble + apply CaptureReply side-effect
+    # equivalent inline (same logic as the side_effects loop in post_chat).
+    user_row = _persist_user_message(db, contact, body)
+    db.flush()
+
+    reply_row = ContactReply(
+        contact_id=contact.id,
+        user_id=contact.user_id,
+        reply_text=reply_text,
+        classified_intent=ai_result.get("intent_category", "uncategorized"),
+        classification_confidence=ai_result.get("confidence", "low"),
+        extracted_data=ai_result.get("extracted_data") or {},
+        raw_ai_response=ai_result,
+    )
+    db.add(reply_row)
+    contact.replied_at = datetime.now(timezone.utc)
+    db.flush()
+    _recompute_and_persist(contact, db)
+    # TODO Commit 3: record_event(db, contact_id=contact.id, event_type="reply_received")
+    # TODO Commit 3: record_event(db, contact_id=contact.id, event_type="reply_classified",
+    #                              event_data={"intent": ai_result["intent_category"]})
+    # TODO Commit 3: if intent == "yes_to_coffee_chat" and extracted_data.get("proposed_time"):
+    #                    record_event(db, contact_id=contact.id, event_type="meeting_time_confirmed",
+    #                                 event_data={"proposed_time": extracted_data["proposed_time"]})
+
+    # Chunk 1 messages: classification chip + Ref text per intent.
+    # NOTE: we DO NOT emit the per-category action_buttons that REF-31's
+    # _generate_reply_capture_response would emit here — auto-draft (Piece 1)
+    # replaces those buttons. Chunk 2 emits the new minimal action_buttons.
+    intent = ai_result.get("intent_category", "uncategorized")
+    if intent not in INTENT_CATEGORIES:
+        intent = "uncategorized"
+    confidence = ai_result.get("confidence", "low")
+    extracted_data = ai_result.get("extracted_data") or {}
+    label = INTENT_TO_LABEL.get(intent, INTENT_TO_LABEL["uncategorized"])
+    text, _per_category_buttons_ignored = _replied_state_response_for_category(
+        contact, intent, confidence, extracted_data,
+    )
+
+    chunk1_messages = [
+        {
+            "role": ROLE_REF, "kind": KIND_REPLY_CLASSIFICATION,
+            "content": {"label": label, "intent": intent, "confidence": confidence},
+        },
+        {"role": ROLE_REF, "kind": KIND_TEXT, "content": {"text": text}},
+    ]
+    chunk1_rows = _persist_ref_messages(db, contact, chunk1_messages)
+    db.flush()
+
+    # Risk 2: COMMIT chunk 1 writes BEFORE yielding. Do not hold the
+    # transaction open across the yield boundary.
+    db.commit()
+    db.refresh(user_row)
+    for r in chunk1_rows:
+        db.refresh(r)
+
+    chunk1_payload = {
+        "chunk": 1,
+        "newMessages": [_msg_to_dict(user_row)] + [_msg_to_dict(r) for r in chunk1_rows],
+    }
+    yield json.dumps(chunk1_payload) + "\n"
+
+    # === CHUNK 2: generate_followup + draft_card + final action_buttons ===
+    # Risk 3: try/except wraps the AI call. If it raises, fall back to
+    # REF-31's static fill_template — chunk 2 ALWAYS emits a draft card
+    # so the user is never left with classification but no draft.
+    draft_text = ""
+    ai_meta: Optional[dict] = None
+
+    # yes_to_coffee_chat skips draft (REF-31 / REF-32: handled by
+    # PostReplyView scheduling bridge, not by a chat draft).
+    if intent != "yes_to_coffee_chat":
+        try:
+            user_ctx = build_user_context(user, db)
+            initial_text = _initial_outreach_text_for_contact(db, contact)
+            followup_result = await loop.run_in_executor(
+                None, generate_followup,
+                contact, job, user_ctx, reply_text, intent, extracted_data, initial_text,
+            )
+            draft_text = str(followup_result.get("draft_text", "")).strip()
+            if draft_text:
+                ai_meta = {
+                    "play": followup_result.get("play", ""),
+                    "reasoning": followup_result.get("reasoning", ""),
+                    "model": "gpt-4o-mini",
+                    "intent_category": intent,
+                }
+        except Exception:
+            logger.exception(
+                "generate_followup failed in stream for contact=%s intent=%s; "
+                "falling back to REF-31 static template",
+                contact.id, intent,
+            )
+
+    # REF-31 fallback if AI didn't produce a draft (failure OR
+    # yes_to_coffee_chat which skips draft generation entirely).
+    if not draft_text:
+        template = INTENT_TO_DRAFT_TEMPLATE.get(intent, "")
+        draft_text = fill_template(template, contact, user, extracted_data) if template else ""
+
+    draft_content: dict = {
+        "text": draft_text,
+        "edits_left": 0,
+        "show_counter": False,
+    }
+    if ai_meta is not None:
+        draft_content["ai_meta"] = ai_meta
+
+    # Piece 2 button cleanup: 2 buttons (Copy & open LinkedIn + Undo replied).
+    # REF-23 send_message action handler (client-only) does copy + window.open.
+    chunk2_messages = [
+        {
+            "role": ROLE_REF, "kind": KIND_TEXT,
+            "content": {"text": "Here's the play — copy it, send, come back when they reply."},
+        },
+        {"role": ROLE_REF, "kind": KIND_DRAFT, "content": draft_content},
+        {
+            "role": ROLE_REF, "kind": KIND_ACTIONS,
+            "content": {"actions": [
+                _action("📋 Copy & open LinkedIn", "send_message", primary=True),
+                _action("↩ Undo replied", ACTION_UNDO, primary=False),
+            ]},
+        },
+    ]
+    chunk2_rows = _persist_ref_messages(db, contact, chunk2_messages)
+    db.flush()
+    # TODO Commit 3: record_event(db, contact_id=contact.id, event_type="draft_generated")
+    db.commit()
+    for r in chunk2_rows:
+        db.refresh(r)
+
+    chunk2_payload = {
+        "chunk": 2,
+        "newMessages": [_msg_to_dict(r) for r in chunk2_rows],
+    }
+    yield json.dumps(chunk2_payload) + "\n"
 
 
 # --- DB helpers ---
@@ -1169,8 +1373,10 @@ def init_chat(
                 },
                 {
                     "role": ROLE_REF, "kind": KIND_ACTIONS,
+                    # REF-34 Piece 2: Record outcome removed (auto-inference
+                    # in Piece 4 replaces it). init_chat REPLIED case (a)
+                    # legacy seed for contacts with no ContactReply row.
                     "content": {"actions": [
-                        _action("📊 Record outcome", "switch_to_record_outcome", primary=False),
                         _action("↩ Undo replied", ACTION_UNDO, primary=False),
                     ]},
                 },
@@ -1227,13 +1433,17 @@ def init_chat(
     "/{job_id}/contacts/{contact_id}/ref-chat",
     status_code=status.HTTP_201_CREATED,
 )
-def post_chat(
+async def post_chat(
     job_id: str,
     contact_id: str,
     body: RefChatPostRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # REF-34: route is async def to support StreamingResponse for the
+    # reply_paste two-stage emission. The action/text branches below
+    # remain sync logic; they don't await anything. Only the
+    # _reply_paste_stream generator awaits run_in_executor for AI calls.
     contact = _load_contact_owned(job_id, contact_id, current_user, db)
     state = contact.lifecycle_status or NOT_CONTACTED
     kind = body.kind
@@ -1299,6 +1509,15 @@ def post_chat(
         if state not in SENT_STATES:
             raise _validation_error("reply_paste", state)
 
+        # REF-34: reply_paste returns a chunked NDJSON stream (chunk 1 =
+        # classification + Ref text, chunk 2 = draft_card + buttons).
+        # Branch off to the async stream generator; the rest of post_chat
+        # (action/text non-streaming path) does not execute for reply_paste.
+        return StreamingResponse(
+            _reply_paste_stream(contact, job_id, current_user, db, body),
+            media_type="application/x-ndjson",
+        )
+
     else:
         # Pydantic Literal already enforces this; defensive only.
         raise HTTPException(status_code=400, detail=f"Unknown kind: {kind!r}")
@@ -1348,13 +1567,9 @@ def post_chat(
             current_draft, user_instruction, edit_number, db,
         )
 
-    elif kind == "reply_paste":
-        # REF-30: classify the pasted reply. parse_reply has its own try/except
-        # fallback (returns uncategorized-low on failure) so the chat continues
-        # even when AI is down.
-        reply_text_val = (content.get("text") or "").strip()
-        job = _load_job_owned(job_id, current_user, db)
-        ai_result = parse_reply(contact, job, current_user, reply_text_val)
+    # REF-34: kind=="reply_paste" branched out earlier to StreamingResponse;
+    # the old REF-30 sync path here is unreachable. _reply_paste_stream owns
+    # parse_reply + generate_followup + persist + CaptureReply equivalent.
 
     # --- REF-31: extracted_data preload for draft_reply_* actions ---
     # REF-32 extension: also fire generate_followup for the AI draft. Both
@@ -1411,26 +1626,18 @@ def post_chat(
     db.flush()
 
     # --- Generate Ref's response ---
-    # REF-30: reply_paste skips the main pure state machine and uses its own
-    # response generator (which always emits classification chip + generic
-    # text + per-category action buttons).
-    if kind == "reply_paste":
-        response = _generate_reply_capture_response(
-            contact=contact,
-            reply_text=(content.get("text") or "").strip(),
-            parsed=ai_result or {},
-        )
-    else:
-        response = _generate_ref_response(
-            contact=contact,
-            user_action={"kind": kind, "content": content},
-            current_state=state,
-            edits_left_after=edits_left_after,
-            ai_result=ai_result,
-            user=current_user,
-            extracted_data=extracted_data_for_handler,
-            followup_ai_result=followup_ai_result,
-        )
+    # REF-34: reply_paste branched to StreamingResponse earlier; this path
+    # only handles action and text kinds via the pure state machine.
+    response = _generate_ref_response(
+        contact=contact,
+        user_action={"kind": kind, "content": content},
+        current_state=state,
+        edits_left_after=edits_left_after,
+        ai_result=ai_result,
+        user=current_user,
+        extracted_data=extracted_data_for_handler,
+        followup_ai_result=followup_ai_result,
+    )
 
     # --- Apply side effects ---
     for se in response.side_effects:

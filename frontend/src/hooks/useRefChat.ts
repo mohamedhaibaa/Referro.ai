@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { initRefChat, listRefChat, postRefChat } from "@/lib/api/refChat";
+import { initRefChat, listRefChat, postRefChat, streamRefChatReply } from "@/lib/api/refChat";
 import { PostRefChatBody, PostRefChatResponse, RefChatMessage } from "@/types/refChat";
 
 const refChatKey = (jobId: string, contactId: string) =>
@@ -29,9 +30,45 @@ export function useInitRefChat(jobId: string, contactId: string) {
 
 export function useSendRefChat(jobId: string, contactId: string) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: PostRefChatBody) => postRefChat(jobId, contactId, body),
-    onSuccess: (response: PostRefChatResponse) => {
+  // REF-34: tracks the inter-chunk "Ref is drafting your response..."
+  // state between chunk 1 (classification) and chunk 2 (draft_card).
+  // Only flips true for the reply_paste stream path.
+  const [isDrafting, setIsDrafting] = useState(false);
+
+  const mutation = useMutation({
+    mutationFn: async (body: PostRefChatBody): Promise<PostRefChatResponse | null> => {
+      // REF-34: reply_paste returns NDJSON chunks; everything else uses
+      // the standard JSON POST. The streamed path appends each chunk to
+      // the React Query cache as it arrives and toggles isDrafting between
+      // chunk 1 and chunk 2 so RefChatPanel can render <TypingIndicator />.
+      if (body.kind === "reply_paste") {
+        setIsDrafting(false);
+        try {
+          await streamRefChatReply(jobId, contactId, body, (payload) => {
+            qc.setQueryData<RefChatMessage[]>(refChatKey(jobId, contactId), (old) =>
+              [...(old ?? []), ...payload.newMessages],
+            );
+            if (payload.chunk === 1) {
+              setIsDrafting(true);
+            } else if (payload.chunk === 2) {
+              setIsDrafting(false);
+            }
+          });
+        } finally {
+          setIsDrafting(false);
+        }
+        // Stream completed — invalidate downstream queries (contacts +
+        // outreach) since the CaptureReply side-effect ran in chunk 1
+        // and lifecycle moved sent → replied.
+        qc.invalidateQueries({ queryKey: ["contacts", jobId] });
+        qc.invalidateQueries({ queryKey: ["outreach", jobId, contactId] });
+        return null;  // streamed; onSuccess is a no-op for this path
+      }
+
+      return await postRefChat(jobId, contactId, body);
+    },
+    onSuccess: (response: PostRefChatResponse | null) => {
+      if (response === null) return;  // REF-34 streamed path already handled cache
       qc.setQueryData<RefChatMessage[]>(refChatKey(jobId, contactId), (old) =>
         [...(old ?? []), ...response.newMessages],
       );
@@ -67,4 +104,6 @@ export function useSendRefChat(jobId: string, contactId: string) {
       }
     },
   });
+
+  return { ...mutation, isDrafting };
 }

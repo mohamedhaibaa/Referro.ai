@@ -251,7 +251,7 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
       }
       navigator.clipboard
         .writeText(text)
-        .then(() => toast.success("Copied to clipboard"))
+        .then(() => toast.success("Copied — paste it on LinkedIn"))
         .catch(() => toast.error("Couldn't copy to clipboard."));
       return;
     }
@@ -273,13 +273,28 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
       }
       navigator.clipboard
         .writeText(text)
-        .then(() => toast.success("Copied to clipboard"))
+        .then(() => toast.success("Copied — paste it on LinkedIn"))
         .catch(() => toast.error("Couldn't copy to clipboard."));
 
       const hasLinkedInUrl = !!contact.linkedinUrl;
       if (hasLinkedInUrl) {
         window.open(contact.linkedinUrl!, "_blank", "noopener,noreferrer");
       }
+
+      // REF-34 fix (Commit 2 hotfix): in non-DRAFT states (e.g., REPLIED
+      // post-draft auto-stream from _reply_paste_stream, or the historical
+      // REF-31 draft_reply_* branch), send_message is just a copy-and-open
+      // action — there's no mark_sent transition to chain to (the original
+      // outreach was already sent; the user is copying a follow-up reply).
+      // REF-23's sendArmed → confirm → mark_sent flow was designed only
+      // for the DRAFTED → SENT path. Skip the chain for non-DRAFT states.
+      // (Piece 4's copy_link_clicked event will capture the "user actually
+      // sent it" signal without the confirm dialog.)
+      const isDraftState =
+        status === STATES.DRAFTED ||
+        status === STATES.FOLLOWUP_1_DRAFTED ||
+        status === STATES.FOLLOWUP_2_DRAFTED;
+      if (!isDraftState) return;
 
       setSendArmed(true);
       if (!hasLinkedInUrl) {
@@ -431,7 +446,11 @@ const RefChatPanel = ({ contact, job, onTransitionToSent, onRequestLegacyView }:
             sendArmed={sendArmed}
           />
         ))}
-        {(send.isPending || updateOutreach.isPending) && <TypingIndicator />}
+        {/* REF-34: send.isDrafting flips true between reply_paste chunk 1
+            and chunk 2 — keeps TypingIndicator visible during the
+            generate_followup wait so the user sees "Ref is drafting..."
+            after the classification chip arrives. */}
+        {(send.isPending || updateOutreach.isPending || send.isDrafting) && <TypingIndicator />}
       </div>
 
       {/* REF-23 / REF-27: send-message confirmation. Escape calls
@@ -621,7 +640,7 @@ const ACTION_LABELS: Record<string, string> = {
   // appeared in the chat above.
   draft_reply_send_and_anchor: "Drafted send-and-anchor",
   draft_reply_send_a_hold: "Drafted send-a-hold",
-  draft_reply_easier_on_call: "Drafted 'easier on a call'",
+  draft_reply_easier_on_call: "Drafted 'easier on a coffee chat'",
   draft_reply_link_plus_meeting: "Drafted link-plus-meeting",
   draft_reply_confirmed_applied: "Drafted 'confirmed applied'",
   draft_reply_warm_intro: "Drafted warm-intro ask",
